@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Weekly Rota Planner</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">Private aviation client services</p>
+        <h1>Weekly rota planner</h1>
+      </div>
+      <div class="header-actions" aria-label="Export actions">
+        <button id="exportJson" type="button">Export JSON</button>
+        <button id="exportCsv" type="button">Export CSV</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="planner-panel" aria-labelledby="plannerTitle">
+        <div class="section-heading">
+          <div>
+            <h2 id="plannerTitle">US Eastern weekly grid</h2>
+            <p>Master schedule runs Monday-Friday, 08:00-22:00 ET. UK equivalents are shown for RS and DP.</p>
+          </div>
+          <div class="heading-tools">
+            <div class="week-nav" aria-label="Week navigation">
+              <button id="previousWeek" type="button">Previous</button>
+              <span id="weekRange" class="week-range"></span>
+              <button id="currentWeek" type="button">Current</button>
+              <button id="nextWeek" type="button">Next</button>
+            </div>
+            <div class="legend" aria-label="Legend">
+              <span><i class="chip rs"></i>RS</span>
+              <span><i class="chip dp"></i>DP</span>
+              <span><i class="chip as"></i>AS</span>
+              <span><i class="status-dot"></i>Warning</span>
+            </div>
+          </div>
+        </div>
+        <div id="grid" class="grid-shell" aria-live="polite"></div>
+        <section id="weekendSummary" class="weekend-summary" aria-live="polite"></section>
+      </section>
+
+      <aside class="side-panel" aria-label="Rota tools and validation">
+        <section class="card">
+          <h2>Block editor</h2>
+          <form id="assignmentForm" class="editor-form">
+            <label>
+              Day
+              <select id="editDay"></select>
+            </label>
+            <div class="inline-fields">
+              <label>
+                Start
+                <input id="editStart" type="time" step="900" value="08:00" />
+              </label>
+              <label>
+                End
+                <input id="editEnd" type="time" step="900" value="10:00" />
+              </label>
+            </div>
+            <fieldset>
+              <legend>People</legend>
+              <div id="peopleChecks" class="check-grid"></div>
+            </fieldset>
+            <label class="checkbox-row">
+              <input id="asOverride" type="checkbox" />
+              AS after-18:30 override
+            </label>
+            <div class="form-actions">
+              <button id="saveBlock" type="submit">Save block</button>
+              <button id="clearBlock" type="button">Clear matching block</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Weekend / on-call</h2>
+          <div id="weekendPanel"></div>
+        </section>
+
+        <section class="card">
+          <h2>Validation</h2>
+          <div id="warnings" class="warnings"></div>
+        </section>
+
+        <section class="card">
+          <h2>Fairness</h2>
+          <div id="fairness" class="fairness-table"></div>
+        </section>
+
+        <section class="card config-card">
+          <div class="config-heading">
+            <h2>Editable config</h2>
+            <button id="applyConfig" type="button">Apply JSON</button>
+          </div>
+          <textarea id="configEditor" spellcheck="false" aria-label="Editable rota JSON configuration"></textarea>
+          <p id="configStatus" class="config-status" role="status"></p>
+        </section>
+      </aside>
+    </main>
+
+    <dialog id="cellDialog">
+      <form method="dialog" class="dialog-body">
+        <h2 id="dialogTitle">Edit slot</h2>
+        <p id="dialogMeta"></p>
+        <div id="dialogChecks" class="check-grid"></div>
+        <label class="checkbox-row">
+          <input id="dialogOverride" type="checkbox" />
+          AS after-18:30 override
+        </label>
+        <menu>
+          <button value="cancel" type="button" id="dialogCancel">Cancel</button>
+          <button value="save" type="submit" id="dialogSave">Save</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
