@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="element-aviation.esproj">
+    <Build />
+    <Deploy />
+  </Project>
+</Solution>
