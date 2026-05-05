@@ -18,12 +18,12 @@
       </div>
     </header>
 
-    <main class="layout">
-      <section class="planner-panel" aria-labelledby="plannerTitle">
+    <main class="app-main">
+      <section class="planner-panel controls-panel" aria-labelledby="plannerTitle">
         <div class="section-heading">
           <div>
             <h2 id="plannerTitle">US Eastern weekly grid</h2>
-            <p>Master schedule runs Monday-Friday, 08:00-22:00 ET. UK equivalents are shown for RS and DP.</p>
+            <p>Visible grid starts at the first staffed slot and runs through 22:00 ET. Business coverage remains 08:00-22:00 ET.</p>
           </div>
           <div class="heading-tools">
             <div class="week-nav" aria-label="Week navigation">
@@ -40,67 +40,135 @@
             </div>
           </div>
         </div>
-        <div id="grid" class="grid-shell" aria-live="polite"></div>
-        <section id="weekendSummary" class="weekend-summary" aria-live="polite"></section>
       </section>
 
-      <aside class="side-panel" aria-label="Rota tools and validation">
-        <section class="card">
-          <h2>Block editor</h2>
-          <form id="assignmentForm" class="editor-form">
-            <label>
-              Day
-              <select id="editDay"></select>
-            </label>
-            <div class="inline-fields">
-              <label>
-                Start
-                <input id="editStart" type="time" step="900" value="08:00" />
-              </label>
-              <label>
-                End
-                <input id="editEnd" type="time" step="900" value="10:00" />
-              </label>
-            </div>
-            <fieldset>
-              <legend>People</legend>
-              <div id="peopleChecks" class="check-grid"></div>
-            </fieldset>
-            <label class="checkbox-row">
-              <input id="asOverride" type="checkbox" />
-              AS after-18:30 override
-            </label>
-            <div class="form-actions">
-              <button id="saveBlock" type="submit">Save block</button>
-              <button id="clearBlock" type="button">Clear matching block</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="card">
-          <h2>Weekend / on-call</h2>
-          <div id="weekendPanel"></div>
-        </section>
-
-        <section class="card">
-          <h2>Validation</h2>
-          <div id="warnings" class="warnings"></div>
-        </section>
-
-        <section class="card">
-          <h2>Fairness</h2>
+      <section class="card data-panel fairness-panel" data-panel="fairness">
+        <button
+          class="data-panel__header"
+          type="button"
+          aria-expanded="true"
+          aria-controls="panel-fairness-body"
+        >
+          <span class="data-panel__title">Fairness</span>
+          <span class="data-panel__summary">Weekly balance</span>
+          <span class="data-panel__chevron" aria-hidden="true">v</span>
+        </button>
+        <div class="data-panel__body" id="panel-fairness-body">
           <div id="fairness" class="fairness-table"></div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <section class="planner-panel grid-panel" aria-labelledby="plannerTitle">
+          <section id="weekendSummary" class="weekend-summary" aria-expanded="false"
+              aria-live="polite"></section>
+          <div id="grid" class="grid-shell" aria-live="polite"></div>
         </section>
 
-        <section class="card config-card">
-          <div class="config-heading">
-            <h2>Editable config</h2>
-            <button id="applyConfig" type="button">Apply JSON</button>
-          </div>
-          <textarea id="configEditor" spellcheck="false" aria-label="Editable rota JSON configuration"></textarea>
-          <p id="configStatus" class="config-status" role="status"></p>
-        </section>
-      </aside>
+        <aside class="side-panel" aria-label="Rota tools and validation">
+          <section class="card data-panel" data-panel="validation">
+            <button
+              class="data-panel__header"
+              type="button"
+              aria-controls="panel-validation-body"
+            >
+              <span class="data-panel__title">Validation</span>
+              <span class="data-panel__summary">Warnings</span>
+              <span class="data-panel__chevron" aria-hidden="true">v</span>
+            </button>
+            <div class="data-panel__body" id="panel-validation-body">
+              <div id="warnings" class="warnings"></div>
+            </div>
+          </section>
+
+          <section class="card data-panel" data-panel="block-editor">
+            <button
+              class="data-panel__header"
+              type="button"
+              aria-controls="panel-block-editor-body"
+            >
+              <span class="data-panel__title">Block editor</span>
+              <span class="data-panel__summary">Assignments</span>
+              <span class="data-panel__chevron" aria-hidden="true">v</span>
+            </button>
+            <div class="data-panel__body" id="panel-block-editor-body">
+              <form id="assignmentForm" class="editor-form">
+                <label>
+                  Day
+                  <select id="editDay"></select>
+                </label>
+                <div class="inline-fields">
+                  <label>
+                    Start
+                    <input id="editStart" type="time" step="900" value="08:00" />
+                  </label>
+                  <label>
+                    End
+                    <input id="editEnd" type="time" step="900" value="10:00" />
+                  </label>
+                </div>
+                <fieldset>
+                  <legend>People</legend>
+                  <div id="peopleChecks" class="check-grid"></div>
+                </fieldset>
+                <div class="form-actions">
+                  <button id="saveBlock" type="submit">Save block</button>
+                  <button id="clearBlock" type="button">Clear matching block</button>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section class="card data-panel" data-panel="weekend">
+            <button
+              class="data-panel__header"
+              type="button"
+              aria-controls="panel-weekend-body"
+            >
+              <span class="data-panel__title">Weekend / on-call</span>
+              <span class="data-panel__summary">Owner</span>
+              <span class="data-panel__chevron" aria-hidden="true">v</span>
+            </button>
+            <div class="data-panel__body" id="panel-weekend-body">
+              <div id="weekendPanel"></div>
+            </div>
+          </section>
+
+          <section class="card config-card data-panel" data-panel="config">
+            <button
+              class="data-panel__header"
+              type="button"
+              aria-controls="panel-config-body"
+            >
+              <span class="data-panel__title">Editable config</span>
+              <span class="data-panel__summary">JSON</span>
+              <span class="data-panel__chevron" aria-hidden="true">v</span>
+            </button>
+            <div class="data-panel__body" id="panel-config-body">
+              <div class="config-heading">
+                <button id="applyConfig" type="button">Apply JSON</button>
+              </div>
+              <textarea id="configEditor" spellcheck="false" aria-label="Editable rota JSON configuration"></textarea>
+              <p id="configStatus" class="config-status" role="status"></p>
+            </div>
+          </section>
+
+          <section class="card data-panel" data-panel="dp-debug">
+            <button
+              class="data-panel__header"
+              type="button"
+              aria-controls="panel-dp-debug-body"
+            >
+              <span class="data-panel__title">DP fixed hours debug</span>
+              <span class="data-panel__summary">Fixed hours</span>
+              <span class="data-panel__chevron" aria-hidden="true">v</span>
+            </button>
+            <div class="data-panel__body" id="panel-dp-debug-body">
+              <div id="dpDebug" class="dp-debug-table"></div>
+            </div>
+          </section>
+        </aside>
+      </div>
     </main>
 
     <dialog id="cellDialog">
@@ -108,10 +176,6 @@
         <h2 id="dialogTitle">Edit slot</h2>
         <p id="dialogMeta"></p>
         <div id="dialogChecks" class="check-grid"></div>
-        <label class="checkbox-row">
-          <input id="dialogOverride" type="checkbox" />
-          AS after-18:30 override
-        </label>
         <menu>
           <button value="cancel" type="button" id="dialogCancel">Cancel</button>
           <button value="save" type="submit" id="dialogSave">Save</button>
