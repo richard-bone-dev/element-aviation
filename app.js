@@ -208,6 +208,7 @@ const ROTA_DATA = {
 let rota = cloneRota(ROTA_DATA);
 let activeDialogSlot = null;
 let weekendSummaryExpanded = false;
+let shouldScrollGridToCurrentHour = true;
 
 const gridEl = document.getElementById('grid');
 const warningsEl = document.getElementById('warnings');
@@ -264,6 +265,29 @@ function bindEvents() {
   document.getElementById('nextWeek').addEventListener('click', () => moveWeek(1));
   document.getElementById('dialogCancel').addEventListener('click', () => dialogEl.close());
   document.getElementById('dialogSave').addEventListener('click', saveDialogSlot);
+  bindPanelModals();
+}
+
+function bindPanelModals() {
+  document.querySelectorAll('[data-modal-target]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const modal = document.getElementById(button.dataset.modalTarget);
+      if (modal) {
+        modal.showModal();
+      }
+    });
+  });
+
+  document.querySelectorAll('.panel-modal').forEach((modal) => {
+    modal.querySelectorAll('[data-modal-close]').forEach((button) => {
+      button.addEventListener('click', () => modal.close());
+    });
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) {
+        modal.close();
+      }
+    });
+  });
 }
 
 function initDataPanels(root = document) {
@@ -274,7 +298,8 @@ function initDataPanels(root = document) {
 
     const panelName = panel.dataset.panel || panel.id || 'panel';
     const { header, body } = ensureDataPanelStructure(panel, panelName);
-    const collapsed = readPanelCollapsed(panelName, defaultPanelCollapsed(panel, panelName));
+    const defaultCollapsed = defaultPanelCollapsed(panel, panelName);
+    const collapsed = panel.closest('.panel-modal') ? defaultCollapsed : readPanelCollapsed(panelName, defaultCollapsed);
     panel.dataset.panelInitialized = 'true';
 
     header.addEventListener('click', () => {
@@ -390,7 +415,7 @@ function setPanelCollapsed(panel, header, body, collapsed, persist) {
   header.setAttribute('aria-expanded', String(!collapsed));
   body.hidden = collapsed;
 
-  if (persist) {
+  if (persist && !panel.closest('.panel-modal')) {
     try {
       localStorage.setItem(panelStorageKey(panel.dataset.panel), String(collapsed));
     } catch (error) {
@@ -450,7 +475,7 @@ function goToCurrentWeek() {
 
 function renderDayOptions() {
   editDayEl.innerHTML = '';
-  rota.config.days.forEach((day) => {
+  displayGridDays().forEach((day) => {
     const option = document.createElement('option');
     option.value = day.id;
     option.textContent = day.label;
@@ -477,6 +502,7 @@ function renderPeopleChecks(container, prefix, selected = []) {
 
 function renderGrid() {
   const slots = displayedGridSlots();
+  const days = displayGridDays();
   const grid = document.createElement('div');
   grid.className = 'rota-grid';
 
@@ -485,7 +511,7 @@ function renderGrid() {
   corner.innerHTML = '<strong>ET</strong><span>UK equivalent</span>';
   grid.appendChild(corner);
 
-  rota.config.days.forEach((day) => {
+  days.forEach((day) => {
     const head = document.createElement('div');
     head.className = 'grid-head';
     head.innerHTML = `<strong>${day.label}</strong><span>${dateForDay(day)}</span>`;
@@ -495,12 +521,15 @@ function renderGrid() {
   slots.forEach((slot) => {
     const timeCell = document.createElement('div');
     timeCell.className = 'time-cell';
-    timeCell.innerHTML = `<strong>${slot.start}-${slot.end}</strong><span>UK ${formatLocalRange(0, slot.start, slot.end, rota.config.ukTimeZone)}</span>`;
+    timeCell.dataset.slotStart = slot.start;
+    timeCell.innerHTML = `<strong>${displaySlotRange(slot)}</strong><span>${formatLocalRange(0, slot.start, slot.end, rota.config.ukTimeZone)}</span>`;
     grid.appendChild(timeCell);
 
-    rota.config.days.forEach((day) => {
+    days.forEach((day) => {
       const assignment = getAssignmentForSlot(day.id, slot.start, slot.end);
-      const slotIssues = validateSlot(day.id, slot.start, slot.end, assignment.people, assignment.details);
+      const slotIssues = isConfiguredRotaDay(day.id)
+        ? validateSlot(day.id, slot.start, slot.end, assignment.people, assignment.details)
+        : emptySlotIssues();
       const button = document.createElement('button');
       button.type = 'button';
       const issueClasses = slotIssues.codes.map((code) => `slot-${code}`);
@@ -521,25 +550,128 @@ function renderGrid() {
         chips.appendChild(chip);
       });
 
-      const note = document.createElement('span');
-      note.className = 'slot-note';
-      note.textContent = buildSlotNote(day, slot.start, slot.end, assignment.people);
-      button.append(chips, note);
+      const note = buildSlotNote(day, slot.start, slot.end, assignment.people);
+      button.dataset.slotNote = note;
+      button.setAttribute('aria-label', `${day.label} ${displaySlotRange(slot)} ET. ${note}`);
+      bindSlotTooltip(button);
+      button.append(chips);
       grid.appendChild(button);
     });
   });
 
   gridEl.innerHTML = '';
   gridEl.appendChild(grid);
+  if (shouldScrollGridToCurrentHour) {
+    shouldScrollGridToCurrentHour = false;
+    requestAnimationFrame(scrollGridToCurrentEtHour);
+  }
 }
 
 function displayedGridSlots() {
-  const visibleGrid = visibleGridRule();
-  const slots = makeSlots(visibleGrid.start, visibleGrid.end);
-  const firstPopulatedIndex = slots.findIndex((slot) => {
-    return rota.config.days.some((day) => getAssignmentForSlot(day.id, slot.start, slot.end).people.length);
+  const displayGrid = displayGridRule();
+  return makeSlots(displayGrid.start, displayGrid.end);
+}
+
+function displayGridRule() {
+  return { start: '00:00', end: '24:00' };
+}
+
+function displayGridDays() {
+  const configuredDays = rota.config.days || [];
+  const days = configuredDays.map((day) => ({ ...day }));
+  [
+    { id: 'sat', label: 'Saturday', dateOffset: 5 },
+    { id: 'sun', label: 'Sunday', dateOffset: 6 }
+  ].forEach((weekendDay) => {
+    if (!days.some((day) => day.id === weekendDay.id)) {
+      days.push(weekendDay);
+    }
   });
-  return firstPopulatedIndex === -1 ? slots : slots.slice(firstPopulatedIndex);
+  return days;
+}
+
+function isConfiguredRotaDay(dayId) {
+  const normalizedDayId = normalizeDayId(dayId);
+  return (rota.config.days || []).some((day) => day.id === normalizedDayId);
+}
+
+function emptySlotIssues() {
+  return { error: false, warning: false, codes: [], messages: [] };
+}
+
+function displaySlotRange(slot) {
+  return `${slot.start}-${slot.end === '24:00' ? '23:59' : slot.end}`;
+}
+
+function bindSlotTooltip(button) {
+  button.addEventListener('pointerenter', () => showSlotTooltip(button));
+  button.addEventListener('pointerleave', hideSlotTooltip);
+  button.addEventListener('focus', () => showSlotTooltip(button));
+  button.addEventListener('blur', hideSlotTooltip);
+}
+
+function showSlotTooltip(button) {
+  const tooltip = slotTooltipElement();
+  tooltip.textContent = button.dataset.slotNote || '';
+  button.setAttribute('aria-describedby', tooltip.id);
+  tooltip.hidden = false;
+
+  const rect = button.getBoundingClientRect();
+  tooltip.style.maxWidth = `${Math.min(280, Math.max(180, window.innerWidth - 24))}px`;
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const topSpace = rect.top;
+  const left = Math.min(Math.max(rect.left, 12), window.innerWidth - tooltipRect.width - 12);
+  const top = topSpace > tooltipRect.height + 14
+    ? rect.top - tooltipRect.height - 8
+    : rect.bottom + 8;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${Math.min(top, window.innerHeight - tooltipRect.height - 12)}px`;
+}
+
+function hideSlotTooltip(event) {
+  if (event && event.currentTarget) {
+    event.currentTarget.removeAttribute('aria-describedby');
+  }
+  slotTooltipElement().hidden = true;
+}
+
+function slotTooltipElement() {
+  let tooltip = document.getElementById('slotTooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'slotTooltip';
+    tooltip.className = 'slot-tooltip';
+    tooltip.hidden = true;
+    tooltip.setAttribute('role', 'tooltip');
+    document.body.appendChild(tooltip);
+  }
+  return tooltip;
+}
+
+function scrollGridToCurrentEtHour() {
+  const currentEtMinutes = currentMasterTimeMinutes();
+  const slots = displayedGridSlots();
+  const slot = slots.find((candidate) => toMinutes(candidate.start) <= currentEtMinutes && currentEtMinutes < toMinutes(candidate.end));
+  const target = slot ? gridEl.querySelector(`.time-cell[data-slot-start="${slot.start}"]`) : null;
+  if (!target) {
+    return;
+  }
+
+  target.tabIndex = -1;
+  const offset = Math.max(target.offsetTop - 92, 0);
+  gridEl.scrollTo({ top: offset, behavior: 'auto' });
+  target.focus({ preventScroll: true });
+}
+
+function currentMasterTimeMinutes() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: rota.config.masterTimeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return (Number(values.hour) % 24) * 60 + Number(values.minute);
 }
 
 function renderWeekendPanel() {
@@ -855,8 +987,8 @@ function clearBlockFromForm() {
 
 function openSlotDialog(dayId, start, end, assignment) {
   activeDialogSlot = { dayId, start, end };
-  const day = rota.config.days.find((item) => item.id === dayId);
-  document.getElementById('dialogTitle').textContent = `${day.label} ${start}-${end} ET`;
+  const day = dayById(dayId);
+  document.getElementById('dialogTitle').textContent = `${day.label} ${start}-${end === '24:00' ? '23:59' : end} ET`;
   document.getElementById('dialogMeta').textContent = `UK equivalent ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`;
   renderPeopleChecks(document.getElementById('dialogChecks'), 'dialog-person', assignment.people);
   dialogEl.showModal();
@@ -1058,7 +1190,7 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
   const codes = [];
   let error = false;
   let warning = false;
-  const day = rota.config.days.find((item) => item.id === dayId);
+  const day = dayById(dayId);
   const weekday = weekdayCoverageRule();
   const peak = peakCoverageRule();
 
@@ -1859,7 +1991,7 @@ function buildSlotNote(day, start, end, people) {
     return 'Miami local same as ET';
   }
 
-  return `${ukPeople.join('/')} UK ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`;
+  return `${ukPeople.join('/')} UK equivalent ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`;
 }
 
 function isPeak(start, end) {
@@ -1873,7 +2005,7 @@ function dateForDay(day) {
 
 function dayById(dayId) {
   const normalizedDayId = normalizeDayId(dayId);
-  return rota.config.days.find((day) => day.id === normalizedDayId);
+  return displayGridDays().find((day) => day.id === normalizedDayId);
 }
 
 function dateForOffset(offset) {

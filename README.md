@@ -19,24 +19,6 @@ Use the week navigation controls above the grid to move between weeks. The weekd
 
 The Fairness panel appears above the rota grid so weekly balance is visible without adding clutter to the side panel. All panels that use the `data-panel` pattern are collapsible from their header button, including validation, fairness, block editor, weekend/on-call, config, and debug panels. Collapsed state persists in `localStorage` with keys such as `rota.panel.fairness.collapsed`.
 
-## Current assumptions
-
-- Weekday cover requires at least 1 person from 08:00 to 22:00 Eastern, Monday-Friday.
-- Peak weekday cover ideally has 2 people from 11:00 to 17:00 Eastern, Monday-Friday. This is an under-ideal warning, not a reason to force unsafe assignments.
-- The visible rota grid searches from 03:00 Eastern and ends at 22:00 Eastern, but empty leading rows are trimmed so the displayed grid starts at the first slot with a person chip. Slots before 08:00 Eastern are display-only and do not create missing-coverage warnings.
-- AS has childcare constraints from 08:00 to 09:30 Eastern and from 16:30 to 18:00 Eastern.
-- DP is UK-based and has fixed working blocks stored in UK local time: Monday-Friday 09:00-15:00 UK and Monday-Wednesday 18:00-20:00 UK. These blocks are converted into the Eastern grid and clipped to the visible 03:00-22:00 Eastern window.
-- DP's fixed blocks total 36 hours against a 42-hour weekly contract target, leaving 6 hours of remaining contract capacity. Extra DP hours are optional/manual/overtime capacity and are not auto-filled.
-- RS can be added automatically as peak-cover rescue where 11:00-17:00 Eastern would otherwise be below ideal, with a configurable afternoon break to avoid an unsafe continuous day.
-- Weekday early-start rotation means Monday-Friday, 08:00 to 11:00 Eastern.
-- Weekday early-start duty alternates weekly between RS and AS and is normally derived as the opposite of the weekday evening owner.
-- Weekday evening rotation means Monday-Friday, 18:00 to 22:00 Eastern.
-- Weekday evening duty alternates weekly between RS and AS.
-- RS can work 08:00 Eastern starts, but is not hard-coded as the automatic starter every week.
-- RS and AS have rest protection after a 22:00 Eastern finish.
-- Weekend/on-call rotation runs Friday 22:00 to Monday 08:00 Eastern and alternates between RS and AS, normally opposite the weekday evening owner.
-- DP does not work weekends and is not eligible for weekend/on-call cover.
-
 ## Editing the rota
 
 Use the block editor to add or replace a day/time block. Clicking a grid slot also opens a quick editor for that 30-minute slot.
@@ -64,6 +46,24 @@ The editable JSON panel contains the full rota object, including:
 - weekday schedule blocks.
 
 After changing the JSON, click **Apply JSON** to re-render the app.
+
+## Current assumptions
+
+- Weekday cover requires at least 1 person from 08:00 to 22:00 Eastern, Monday-Friday.
+- Peak weekday cover ideally has 2 people from 11:00 to 17:00 Eastern, Monday-Friday. This is an under-ideal warning, not a reason to force unsafe assignments.
+- The visible rota grid searches from 03:00 Eastern and ends at 22:00 Eastern, but empty leading rows are trimmed so the displayed grid starts at the first slot with a person chip. Slots before 08:00 Eastern are display-only and do not create missing-coverage warnings.
+- AS has childcare constraints from 08:00 to 09:30 Eastern and from 16:30 to 18:00 Eastern.
+- DP is UK-based and has fixed working blocks stored in UK local time: Monday-Friday 09:00-15:00 UK and Monday-Wednesday 18:00-20:00 UK. These blocks are converted into the Eastern grid and clipped to the visible 03:00-22:00 Eastern window.
+- DP's fixed blocks total 36 hours against a 42-hour weekly contract target, leaving 6 hours of remaining contract capacity. Extra DP hours are optional/manual/overtime capacity and are not auto-filled.
+- RS can be added automatically as peak-cover rescue where 11:00-17:00 Eastern would otherwise be below ideal, with a configurable afternoon break to avoid an unsafe continuous day.
+- Weekday early-start rotation means Monday-Friday, 08:00 to 11:00 Eastern.
+- Weekday early-start duty alternates weekly between RS and AS and is normally derived as the opposite of the weekday evening owner.
+- Weekday evening rotation means Monday-Friday, 18:00 to 22:00 Eastern.
+- Weekday evening duty alternates weekly between RS and AS.
+- RS can work 08:00 Eastern starts, but is not hard-coded as the automatic starter every week.
+- RS and AS have rest protection after a 22:00 Eastern finish.
+- Weekend/on-call rotation runs Friday 22:00 to Monday 08:00 Eastern and alternates between RS and AS, normally opposite the weekday evening owner.
+- DP does not work weekends and is not eligible for weekend/on-call cover.
 
 ## Validation
 
