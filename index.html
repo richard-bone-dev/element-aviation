@@ -12,9 +12,20 @@
         <p class="eyebrow">Private aviation client services</p>
         <h1>Weekly rota planner</h1>
       </div>
-      <div class="header-actions" aria-label="Export actions">
-        <button id="exportJson" type="button">Export JSON</button>
-        <button id="exportCsv" type="button">Export CSV</button>
+      <div class="header-actions" aria-label="Toolbar actions">
+        <div class="toolbar-group" aria-label="Export actions">
+          <button id="exportJson" class="icon-button" type="button" aria-label="Export JSON" title="Export JSON">&#x21E9;<span class="button-label">JSON</span></button>
+          <button id="exportCsv" class="icon-button" type="button" aria-label="Export CSV" title="Export CSV">&#x21E9;<span class="button-label">CSV</span></button>
+        </div>
+        <span class="toolbar-divider" aria-hidden="true">|</span>
+        <div class="toolbar-group" aria-label="Roster data tools">
+          <button class="icon-button" type="button" data-modal-target="validationModal" aria-label="Open validation" title="Validation">&#x26A0;</button>
+          <button class="icon-button" type="button" data-modal-target="fairnessModal" aria-label="Open fairness" title="Fairness">&#x2256;</button>
+          <button class="icon-button" type="button" data-modal-target="blockEditorModal" aria-label="Open block editor" title="Block editor">&#x270E;</button>
+          <button class="icon-button" type="button" data-modal-target="weekendModal" aria-label="Open weekend and on-call" title="Weekend / on-call">&#x260E;</button>
+          <button class="icon-button" type="button" data-modal-target="configModal" aria-label="Open editable config" title="Editable config">&#x2699;</button>
+          <button class="icon-button" type="button" data-modal-target="dpDebugModal" aria-label="Open DP fixed hours debug" title="DP fixed hours debug">i</button>
+        </div>
       </div>
     </header>
 
@@ -27,10 +38,10 @@
           </div>
           <div class="heading-tools">
             <div class="week-nav" aria-label="Week navigation">
-              <button id="previousWeek" type="button">Previous</button>
+              <button id="previousWeek" class="icon-button" type="button" aria-label="Previous" title="Previous">&#x2039;</button>
               <span id="weekRange" class="week-range"></span>
-              <button id="currentWeek" type="button">Current</button>
-              <button id="nextWeek" type="button">Next</button>
+              <button id="currentWeek" class="icon-button" type="button" aria-label="Current" title="Current">&#x25CE;</button>
+              <button id="nextWeek" class="icon-button" type="button" aria-label="Next" title="Next">&#x203A;</button>
             </div>
             <div class="legend" aria-label="Legend">
               <span><i class="chip rs"></i>RS</span>
@@ -38,48 +49,45 @@
               <span><i class="chip as"></i>AS</span>
               <span><i class="status-dot"></i>Warning</span>
             </div>
-            <div class="panel-tools" aria-label="Roster data tools">
-              <button class="icon-button" type="button" data-modal-target="fairnessModal" aria-label="Open fairness" title="Fairness">&#x2256;</button>
-              <button class="icon-button" type="button" data-modal-target="blockEditorModal" aria-label="Open block editor" title="Block editor">&#x270E;</button>
-              <button class="icon-button" type="button" data-modal-target="weekendModal" aria-label="Open weekend and on-call" title="Weekend / on-call">&#x260E;</button>
-              <button class="icon-button" type="button" data-modal-target="configModal" aria-label="Open editable config" title="Editable config">&#x2699;</button>
-              <button class="icon-button" type="button" data-modal-target="dpDebugModal" aria-label="Open DP fixed hours debug" title="DP fixed hours debug">i</button>
-            </div>
           </div>
         </div>
       </section>
 
       <div class="layout">
         <section class="planner-panel grid-panel" aria-labelledby="plannerTitle">
-          <section id="weekendSummary" class="weekend-summary" aria-expanded="false"
-              aria-live="polite"></section>
           <div id="grid" class="grid-shell" aria-live="polite"></div>
         </section>
-
-        <aside class="side-panel" aria-label="Rota tools and validation">
-          <section class="card data-panel" data-panel="validation">
-            <button
-              class="data-panel__header"
-              type="button"
-              aria-controls="panel-validation-body"
-            >
-              <span class="data-panel__title">Validation</span>
-              <span class="data-panel__summary">Warnings</span>
-              <span class="data-panel__chevron" aria-hidden="true">v</span>
-            </button>
-            <div class="data-panel__body" id="panel-validation-body">
-              <div id="warnings" class="warnings"></div>
-            </div>
-          </section>
-        </aside>
       </div>
     </main>
+
+    <dialog id="validationModal" class="panel-modal">
+      <div class="modal-shell">
+        <div class="modal-heading">
+          <h2>Validation</h2>
+          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close validation" title="Close validation">&times;</button>
+        </div>
+        <section class="card data-panel" data-panel="validation" data-default-collapsed="false">
+          <button
+            class="data-panel__header"
+            type="button"
+            aria-controls="panel-validation-body"
+          >
+            <span class="data-panel__title">Validation</span>
+            <span class="data-panel__summary">Warnings</span>
+            <span class="data-panel__chevron" aria-hidden="true">v</span>
+          </button>
+          <div class="data-panel__body" id="panel-validation-body">
+            <div id="warnings" class="warnings"></div>
+          </div>
+        </section>
+      </div>
+    </dialog>
 
     <dialog id="fairnessModal" class="panel-modal">
       <div class="modal-shell">
         <div class="modal-heading">
           <h2>Fairness</h2>
-          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close fairness">&times;</button>
+          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close fairness" title="Close fairness">&times;</button>
         </div>
         <section class="card data-panel fairness-panel" data-panel="fairness" data-default-collapsed="false">
           <button
@@ -103,7 +111,7 @@
       <div class="modal-shell">
         <div class="modal-heading">
           <h2>Block editor</h2>
-          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close block editor">&times;</button>
+          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close block editor" title="Close block editor">&times;</button>
         </div>
         <section class="card data-panel" data-panel="block-editor" data-default-collapsed="false">
           <button
@@ -136,8 +144,8 @@
                 <div id="peopleChecks" class="check-grid"></div>
               </fieldset>
               <div class="form-actions">
-                <button id="saveBlock" type="submit">Save block</button>
-                <button id="clearBlock" type="button">Clear matching block</button>
+                <button id="saveBlock" type="submit" aria-label="Save block" title="Save block">&#x2713;<span class="button-label">Save block</span></button>
+                <button id="clearBlock" type="button" aria-label="Clear matching block" title="Clear matching block">&#x232B;<span class="button-label">Clear matching block</span></button>
               </div>
             </form>
           </div>
@@ -149,7 +157,7 @@
       <div class="modal-shell">
         <div class="modal-heading">
           <h2>Weekend / on-call</h2>
-          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close weekend and on-call">&times;</button>
+          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close weekend and on-call" title="Close weekend and on-call">&times;</button>
         </div>
         <section class="card data-panel" data-panel="weekend" data-default-collapsed="false">
           <button
@@ -172,7 +180,7 @@
       <div class="modal-shell">
         <div class="modal-heading">
           <h2>Editable config</h2>
-          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close editable config">&times;</button>
+          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close editable config" title="Close editable config">&times;</button>
         </div>
         <section class="card config-card data-panel" data-panel="config" data-default-collapsed="false">
           <button
@@ -186,7 +194,7 @@
           </button>
           <div class="data-panel__body" id="panel-config-body">
             <div class="config-heading">
-              <button id="applyConfig" type="button">Apply JSON</button>
+              <button id="applyConfig" type="button" aria-label="Apply JSON" title="Apply JSON">&#x2713;<span class="button-label">Apply JSON</span></button>
             </div>
             <textarea id="configEditor" spellcheck="false" aria-label="Editable rota JSON configuration"></textarea>
             <p id="configStatus" class="config-status" role="status"></p>
@@ -199,7 +207,7 @@
       <div class="modal-shell">
         <div class="modal-heading">
           <h2>DP fixed hours debug</h2>
-          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close DP fixed hours debug">&times;</button>
+          <button class="icon-button modal-close" type="button" data-modal-close aria-label="Close DP fixed hours debug" title="Close DP fixed hours debug">&times;</button>
         </div>
         <section class="card data-panel" data-panel="dp-debug" data-default-collapsed="false">
           <button
@@ -224,8 +232,8 @@
         <p id="dialogMeta"></p>
         <div id="dialogChecks" class="check-grid"></div>
         <menu>
-          <button value="cancel" type="button" id="dialogCancel">Cancel</button>
-          <button value="save" type="submit" id="dialogSave">Save</button>
+          <button value="cancel" type="button" id="dialogCancel" aria-label="Cancel" title="Cancel">&#x2715;<span class="button-label">Cancel</span></button>
+          <button value="save" type="submit" id="dialogSave" aria-label="Save" title="Save">&#x2713;<span class="button-label">Save</span></button>
         </menu>
       </form>
     </dialog>

@@ -10,9 +10,11 @@
   --dp: #A7D8FF;
   --as: #C8F7C5;
   --danger: #b42318;
-  --danger-bg: #fff1f0;
+  --danger-bg: #e8f4ff;
   --warn: #9a6700;
-  --warn-bg: #fff8db;
+  --warn-bg: #e8f4ff;
+  --problem-bg: #e8f4ff;
+  --problem-accent: #b8dcff;
   --ok: #28724b;
   --shadow: 0 12px 32px rgba(30, 44, 62, 0.08);
 }
@@ -98,7 +100,7 @@ menu {
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 390px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -151,11 +153,22 @@ menu {
   white-space: nowrap;
 }
 
-.panel-tools {
+.toolbar-group {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+
+.header-actions {
+  align-items: center;
+  flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.toolbar-divider {
+  color: var(--line);
+  font-weight: 700;
 }
 
 .icon-button {
@@ -165,6 +178,14 @@ menu {
   min-height: 34px;
   min-width: 34px;
   padding: 6px;
+}
+
+.button-label {
+  margin-left: 6px;
+}
+
+.header-actions .button-label {
+  margin-left: 4px;
 }
 
 .modal-close {
@@ -267,6 +288,13 @@ menu {
   min-height: 58px;
 }
 
+.grid-head.current-date {
+  background: #eef7ff;
+  border-left: 2px solid #7da9cc;
+  border-right: 2px solid #7da9cc;
+  box-shadow: inset 0 3px 0 #7da9cc;
+}
+
 .grid-head:first-child {
   left: 0;
   z-index: 4;
@@ -310,6 +338,15 @@ menu {
   border-radius: 0;
 }
 
+.slot-cell.current-date {
+  border-left: 2px solid rgba(125, 169, 204, 0.7);
+  border-right: 2px solid rgba(125, 169, 204, 0.7);
+}
+
+.slot-cell.current-date-soft {
+  background: #f7fbff;
+}
+
 .slot-cell:hover {
   background: #f8fbfb;
 }
@@ -327,44 +364,44 @@ menu {
 }
 
 .slot-cell.slot-under-covered {
-  background: #fff1f0;
+  background: var(--problem-bg);
   box-shadow: inset 4px 0 0 var(--danger);
 }
 
 .slot-cell.slot-peak-undercovered,
 .slot-cell.slot-childcare-conflict {
-  background: #fff8db;
+  background: var(--problem-bg);
   box-shadow: inset 4px 0 0 var(--warn);
 }
 
 .slot-cell.slot-dp-outside-fixed-hours {
-  background: #fff8db;
+  background: var(--problem-bg);
   box-shadow: inset 4px 0 0 var(--warn);
 }
 
 .slot-cell.slot-rs-peak-rescue {
-  background: #f2fff7;
-  box-shadow: inset 4px 0 0 #2f855a;
+  background: #ffffff;
+  box-shadow: inset 4px 0 0 var(--line);
 }
 
 .slot-cell.slot-fixed-hours-missing {
-  background: #fff8db;
+  background: var(--problem-bg);
   box-shadow: inset 4px 0 0 var(--warn);
 }
 
 .slot-cell.slot-weekday-evening-rotation-conflict {
-  background: #f6f0ff;
+  background: var(--problem-bg);
   box-shadow: inset 4px 0 0 #7c3aed;
 }
 
 .slot-cell.slot-weekday-early-start-rotation-conflict,
 .slot-cell.slot-same-person-early-and-evening {
-  background: #eef6ff;
+  background: var(--problem-bg);
   box-shadow: inset 4px 0 0 #2563eb;
 }
 
 .slot-cell.slot-late-finish {
-  background: #fff5ea;
+  background: var(--problem-bg);
   box-shadow: inset 4px 0 0 #a15c00;
 }
 
@@ -395,87 +432,42 @@ menu {
   background: var(--as);
 }
 
-.weekend-summary {
-  border-bottom: 1px solid var(--line);
-  background: #fbfcfd;
-  padding: 14px 18px 18px;
-}
-
-.weekend-summary details {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-}
-
-.weekend-summary details.weekend-conflict {
-  border-color: #e6d18a;
-  box-shadow: inset 4px 0 0 var(--warn);
-}
-
-.weekend-summary summary {
+.on-call-marker {
   align-items: center;
-  cursor: pointer;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: space-between;
-  list-style: none;
-  padding: 12px 14px;
-}
-
-.weekend-summary summary::-webkit-details-marker {
-  display: none;
-}
-
-.weekend-title {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-weight: 700;
-}
-
-.weekend-detail {
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-}
-
-.weekend-detail p {
+  --staff-border: #aeb8c4;
+  --staff-color: var(--muted);
+  --staff-tint: #f7f9fa;
+  background: var(--staff-tint);
+  border: 1px dashed var(--staff-border);
+  border-radius: 999px;
   color: var(--muted);
-  margin: 0;
+  display: inline-flex;
+  font-size: 0.68rem;
+  gap: 4px;
+  line-height: 1;
+  padding: 3px 6px;
 }
 
-.weekend-times {
-  display: grid;
-  gap: 6px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.on-call-marker.rs {
+  --staff-border: #ffd999;
+  --staff-color: #ffa500;
+  --staff-tint: #fff3da;
 }
 
-.weekend-time-block {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px;
+.on-call-marker.dp {
+  --staff-border: #b8dcff;
+  --staff-color: #1e90ff;
+  --staff-tint: #e8f4ff;
 }
 
-.weekend-time-block strong {
-  display: block;
-  font-size: 0.84rem;
+.on-call-marker.as {
+  --staff-border: #bfefbf;
+  --staff-color: #90ee90;
+  --staff-tint: #ecfbea;
 }
 
-.weekend-time-block span {
-  color: var(--muted);
-  display: block;
-  font-size: 0.78rem;
-  margin-top: 2px;
-}
-
-.side-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  min-width: 0;
+.on-call-icon {
+  color: var(--staff-color);
 }
 
 .card {
@@ -797,7 +789,7 @@ menu {
 
   .legend,
   .week-nav,
-  .panel-tools {
+  .toolbar-group {
     justify-content: flex-start;
   }
 }
@@ -810,7 +802,12 @@ menu {
 }
 
 @media (max-width: 720px) {
-  .app-header,
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
   .section-heading {
     align-items: stretch;
   }
@@ -827,16 +824,39 @@ menu {
     flex-wrap: wrap;
   }
 
-  .header-actions button,
-  .form-actions button {
-    flex: 1 1 140px;
+  .header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .button-label {
+    border: 0;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    height: 1px;
+    margin: 0;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    white-space: nowrap;
+    width: 1px;
+  }
+
+  .header-actions button {
+    flex: 0 0 auto;
+  }
+
+  .form-actions button,
+  menu button {
+    align-items: center;
+    display: inline-flex;
+    flex: 0 0 auto;
+    justify-content: center;
+    min-width: 38px;
+    padding: 8px;
   }
 
   .check-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .weekend-times {
     grid-template-columns: 1fr;
   }
 }

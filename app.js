@@ -59,6 +59,15 @@ const ROTA_DATA = {
             end: '20:00',
             timeZone: 'Europe/London',
             type: 'fixed'
+          },
+          {
+            id: 'dp-sat-morning',
+            label: 'Saturday fixed hours',
+            days: ['Sat'],
+            start: '09:00',
+            end: '12:00',
+            timeZone: 'Europe/London',
+            type: 'fixed'
           }
         ]
       },
@@ -207,7 +216,6 @@ const ROTA_DATA = {
 
 let rota = cloneRota(ROTA_DATA);
 let activeDialogSlot = null;
-let weekendSummaryExpanded = false;
 let shouldScrollGridToCurrentHour = true;
 
 const gridEl = document.getElementById('grid');
@@ -219,7 +227,6 @@ const configStatusEl = document.getElementById('configStatus');
 const editDayEl = document.getElementById('editDay');
 const peopleChecksEl = document.getElementById('peopleChecks');
 const weekendPanelEl = document.getElementById('weekendPanel');
-const weekendSummaryEl = document.getElementById('weekendSummary');
 const weekRangeEl = document.getElementById('weekRange');
 const dialogEl = document.getElementById('cellDialog');
 const smallPanelMedia = window.matchMedia('(max-width: 720px)');
@@ -243,6 +250,8 @@ const panelSummaries = {
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
+  rota.config.weekStart = mondayForDate(new Date());
+  ensureWeekendRotationShape();
   initDataPanels();
   renderDayOptions();
   renderPeopleChecks(peopleChecksEl, 'form-person');
@@ -436,7 +445,6 @@ function renderAll() {
   applyRightColumnOrder();
   renderWeekNavigation();
   renderGrid();
-  renderWeekendSummary();
   renderWeekendPanel();
   const validation = validateRota();
   renderWarnings(validation);
@@ -513,7 +521,7 @@ function renderGrid() {
 
   days.forEach((day) => {
     const head = document.createElement('div');
-    head.className = 'grid-head';
+    head.className = ['grid-head', isCurrentDisplayDate(day) ? 'current-date' : ''].filter(Boolean).join(' ');
     head.innerHTML = `<strong>${day.label}</strong><span>${dateForDay(day)}</span>`;
     grid.appendChild(head);
   });
@@ -534,7 +542,17 @@ function renderGrid() {
       button.type = 'button';
       const issueClasses = slotIssues.codes.map((code) => `slot-${code}`);
       const rescueClass = hasAssignmentSource({ details: assignment.details }, 'RS', 'rs-peak-rescue') ? 'slot-rs-peak-rescue' : '';
-      button.className = ['slot-cell', isPeak(slot.start, slot.end) ? 'peak' : '', rescueClass, slotIssues.error ? 'issue' : '', slotIssues.warning ? 'warning' : '', ...issueClasses].filter(Boolean).join(' ');
+      const hasValidationIssue = slotIssues.messages.length > 0;
+      button.className = [
+        'slot-cell',
+        isCurrentDisplayDate(day) ? 'current-date' : '',
+        isCurrentDisplayDate(day) && !hasValidationIssue ? 'current-date-soft' : '',
+        isPeak(slot.start, slot.end, day.id) ? 'peak' : '',
+        rescueClass,
+        slotIssues.error ? 'issue' : '',
+        slotIssues.warning ? 'warning' : '',
+        ...issueClasses
+      ].filter(Boolean).join(' ');
       button.addEventListener('click', () => openSlotDialog(day.id, slot.start, slot.end, assignment));
 
       const chips = document.createElement('span');
@@ -549,11 +567,35 @@ function renderGrid() {
         chip.textContent = personId;
         chips.appendChild(chip);
       });
+      const weekendOwnerId = getWeekendOnCallPersonForSlot(day.id, slot.start, slot.end);
+      if (weekendOwnerId) {
+        const owner = personById(weekendOwnerId);
+        if (owner) {
+          const onCallMarker = document.createElement('span');
+          onCallMarker.className = `on-call-marker ${owner.colorClass}`;
+          const onCallIcon = document.createElement('span');
+          onCallIcon.className = 'on-call-icon';
+          onCallIcon.setAttribute('aria-hidden', 'true');
+          onCallIcon.textContent = '\u260E';
+          const onCallInitials = document.createElement('span');
+          onCallInitials.textContent = owner.id;
+          onCallMarker.title = `${owner.id} on call`;
+          onCallMarker.setAttribute('aria-label', `${owner.id} on call`);
+          onCallMarker.append(onCallIcon, onCallInitials);
+          chips.appendChild(onCallMarker);
+        }
+      }
 
-      const note = buildSlotNote(day, slot.start, slot.end, assignment.people);
-      button.dataset.slotNote = note;
-      button.setAttribute('aria-label', `${day.label} ${displaySlotRange(slot)} ET. ${note}`);
-      bindSlotTooltip(button);
+      const visiblePeople = weekendOwnerId && !assignment.people.includes(weekendOwnerId)
+        ? [...assignment.people, weekendOwnerId]
+        : assignment.people;
+      const note = buildSlotNote(day, slot.start, slot.end, visiblePeople, weekendOwnerId);
+      const validationNote = buildSlotValidationNote(slotIssues);
+      if (validationNote) {
+        button.dataset.slotNote = validationNote;
+        bindSlotTooltip(button);
+      }
+      button.setAttribute('aria-label', buildSlotAriaLabel(day, slot, note));
       button.append(chips);
       grid.appendChild(button);
     });
@@ -599,8 +641,20 @@ function emptySlotIssues() {
   return { error: false, warning: false, codes: [], messages: [] };
 }
 
+function buildSlotValidationNote(slotIssues) {
+  return slotIssues.messages.map((message) => message.message).join(' ');
+}
+
+function buildSlotAriaLabel(day, slot, note) {
+  return `${day.label} ${displaySlotRange(slot)} ET. ${note}`;
+}
+
 function displaySlotRange(slot) {
   return `${slot.start}-${slot.end === '24:00' ? '23:59' : slot.end}`;
+}
+
+function isCurrentDisplayDate(day) {
+  return dateForDayIso(day) === zonedIsoDate(new Date(), rota.config.masterTimeZone);
 }
 
 function bindSlotTooltip(button) {
@@ -718,53 +772,6 @@ function renderWeekendPanel() {
   weekendPanelEl.appendChild(wrapper);
 }
 
-function renderWeekendSummary() {
-  ensureWeekendRotationShape();
-  const ownerId = getWeekendOwnerForWeek(rota.config.weekStart);
-  const owner = personById(ownerId) || rota.config.people[0];
-  const weekendRule = rota.config.coverageRules.weekendOnCall;
-  const override = Boolean(weekendOnCallRotationRule().assignments[rota.config.weekStart]);
-  const weekendIssues = validateWeekendRotation();
-  const conflictClass = weekendIssues.length ? 'weekend-conflict' : '';
-  const fridayDate = dateForOffset(4);
-  const mondayDate = dateForOffset(7);
-  const openAttribute = weekendSummaryExpanded ? ' open' : '';
-
-  weekendSummaryEl.innerHTML = `
-    <details class="${conflictClass}"${openAttribute}>
-      <summary>
-        <span class="weekend-title">
-          Weekend on-call
-          <span class="person-chip ${owner.colorClass}">${owner.id}</span>
-        </span>
-        <span class="weekend-meta">${weekendRangeLabel()}${override ? ' - manual assignment' : ' - rotation'}</span>
-      </summary>
-      <div class="weekend-detail">
-        <p>${owner.id} is assigned from Friday 22:00 ET to Monday 08:00 ET for the displayed week.</p>
-        <div class="weekend-times" aria-label="Weekend cover dates">
-          <div class="weekend-time-block">
-            <strong>Start ET</strong>
-            <span>${formatDateLabel(fridayDate)} ${weekendRule.start}</span>
-          </div>
-          <div class="weekend-time-block">
-            <strong>End ET</strong>
-            <span>${formatDateLabel(mondayDate)} ${weekendRule.end}</span>
-          </div>
-          <div class="weekend-time-block">
-            <strong>UK equivalent</strong>
-            <span>${formatWeekendLocalRange(rota.config.ukTimeZone)}</span>
-          </div>
-        </div>
-      </div>
-    </details>
-  `;
-  weekendSummaryEl.setAttribute('aria-expanded', String(weekendSummaryExpanded));
-  weekendSummaryEl.querySelector('details').addEventListener('toggle', (event) => {
-    weekendSummaryExpanded = event.currentTarget.open;
-    weekendSummaryEl.setAttribute('aria-expanded', String(weekendSummaryExpanded));
-  });
-}
-
 function renderWarnings(validation) {
   warningsEl.innerHTML = '';
   if (!validation.warnings.length) {
@@ -787,12 +794,9 @@ function renderFairness(validation) {
   const scores = calculateFairness(validation);
   const headings = [
     ['Person', 'Person identifier from the rota people configuration.'],
-    ['Total', 'Fixed people use fixed hours plus extra hours plus weekend on-call. Others use assigned weekday hours plus weekend on-call.'],
+    ['Total', 'Active working or coverage hours only; weekend on-call is shown separately and excluded.'],
     ['Fixed', 'Contracted fixed working blocks: each configured block duration multiplied by its configured days.'],
     ['Extra', 'Optional or additional assigned hours outside fixed working blocks.'],
-    ['Target', 'Configured weekly contract hours, when a contractHoursPerWeek value exists.'],
-    ['Remain', 'Target minus Total, floored at zero.'],
-    ['+/-', 'Total minus Target. Positive is over target; negative is under target.'],
     ['Peak', 'Assigned hours overlapping the configured peak coverage window.'],
     ['Rescue', 'Hours added by the automatic RS peak-rescue assignment source.'],
     ['Evening', 'Assigned hours overlapping the weekday evening rotation window.'],
@@ -800,9 +804,7 @@ function renderFairness(validation) {
     ['On-call', 'Estimated weekend on-call hours for the current weekend owner.'],
     ['Breaks', 'For RS only: number of gaps between merged working ranges across the week.'],
     ['Longest', 'For RS only: longest continuous merged working range, in hours.'],
-    ['Frag', 'For RS only: count of fragmented-day warnings.'],
-    ['Child', 'Count of AS childcare-conflict slots.'],
-    ['Late', 'Count of late-finish slots for UK-based people.'],
+    ['Late hrs', 'Assigned hours in high-burden late-finish slots for UK-based people.'],
     ['Early', 'Count of late-to-early turnaround warnings.'],
     ['Burden', 'Weighted score using total, peak, rescue, evening, on-call, late finish, childcare, rotation, weekend, same-person, and turnaround penalties.']
   ];
@@ -812,9 +814,6 @@ function renderFairness(validation) {
       <td>${score.total.toFixed(1)}</td>
       <td>${score.fixed.toFixed(1)}</td>
       <td>${score.optional.toFixed(1)}</td>
-      <td>${score.contract ? score.contract.toFixed(1) : '-'}</td>
-      <td>${score.contract ? score.remaining.toFixed(1) : '-'}</td>
-      <td>${score.contract ? score.diff.toFixed(1) : '-'}</td>
       <td>${score.peak.toFixed(1)}</td>
       <td>${score.peakRescue.toFixed(1)}</td>
       <td>${score.evening.toFixed(1)}</td>
@@ -822,9 +821,7 @@ function renderFairness(validation) {
       <td>${score.weekend.toFixed(1)}</td>
       <td>${score.breakCount}</td>
       <td>${score.longestContinuous.toFixed(1)}</td>
-      <td>${score.fragmentedDayWarnings}</td>
-      <td>${score.childcareOverrides}</td>
-      <td>${score.lateFinishCount}</td>
+      <td>${score.late.toFixed(1)}</td>
       <td>${score.earlyAfterLateWarnings}</td>
       <td><span class="score-pill">${score.score.toFixed(1)}</span></td>
     </tr>
@@ -1210,7 +1207,7 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
     addIssue('error', 'under-covered', `${day.label} ${start}-${end} ET has no weekday coverage.`);
   }
 
-  if (intersects(start, end, peak.start, peak.end) && people.length < peak.idealPeople) {
+  if (isPeak(start, end, dayId) && people.length < peak.idealPeople) {
     addIssue('warning', 'peak-undercovered', `${day.label} ${start}-${end} ET is below ideal peak coverage (${people.length}/${peak.idealPeople}).`);
   }
 
@@ -1437,7 +1434,7 @@ function calculateFairness(validation) {
         return;
       }
       scores[personId].assigned += hours;
-      if (isPeak(slot.start, slot.end)) {
+      if (isPeak(slot.start, slot.end, slot.dayId)) {
         scores[personId].peak += hours;
       }
       if (hasAssignmentSource(slot, personId, 'rs-peak-rescue')) {
@@ -1501,7 +1498,7 @@ function calculateFairness(validation) {
   }
 
   Object.values(scores).forEach((score) => {
-    score.total = score.fixed ? score.fixed + score.optional + score.weekend : score.assigned + score.weekend;
+    score.total = score.fixed ? score.fixed + score.optional : score.assigned;
     score.diff = score.contract ? score.total - score.contract : 0;
     score.remaining = score.contract ? Math.max(score.contract - score.total, 0) : 0;
     score.score =
@@ -1611,7 +1608,7 @@ function getFixedAssignmentsForSlot(dayId, start, end) {
 function getRsPeakRescueAssignment(dayId, start, end, details) {
   const peak = peakCoverageRule();
   const rule = rsCoverageSupportRule();
-  if (!rule.enabled || !intersects(start, end, peak.start, peak.end)) {
+  if (!rule.enabled || !isMondayToFriday(dayId) || !intersects(start, end, peak.start, peak.end)) {
     return [];
   }
   if (details.has('RS') || details.size >= peak.idealPeople) {
@@ -1628,6 +1625,10 @@ function getRsPeakRescueAssignment(dayId, start, end, details) {
     source: 'rs-peak-rescue',
     assignmentType: 'automatic'
   }];
+}
+
+function isMondayToFriday(dayId) {
+  return ['mon', 'tue', 'wed', 'thu', 'fri'].includes(normalizeDayId(dayId));
 }
 
 function blocksForPerson(dayId, personId) {
@@ -1977,9 +1978,14 @@ function hasAssignmentSource(slot, personId, source) {
   return assignments.some((assignment) => assignment.source === source);
 }
 
-function buildSlotNote(day, start, end, people) {
+function buildSlotNote(day, start, end, people, weekendOwnerId = '') {
+  const notes = [];
+  if (weekendOwnerId) {
+    notes.push(`${weekendOwnerId} weekend on-call`);
+  }
   if (!people.length) {
-    return 'No one assigned';
+    notes.push('No one assigned');
+    return notes.join('. ');
   }
 
   const ukPeople = people.filter((personId) => {
@@ -1988,19 +1994,39 @@ function buildSlotNote(day, start, end, people) {
   });
 
   if (!ukPeople.length) {
-    return 'Miami local same as ET';
+    notes.push('Miami local same as ET');
+    return notes.join('. ');
   }
 
-  return `${ukPeople.join('/')} UK equivalent ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`;
+  notes.push(`${ukPeople.join('/')} UK equivalent ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`);
+  return notes.join('. ');
 }
 
-function isPeak(start, end) {
+function isPeak(start, end, dayId = '') {
+  if (dayId && !isMondayToFriday(dayId)) {
+    return false;
+  }
   const peak = peakCoverageRule();
   return intersects(start, end, peak.start, peak.end);
 }
 
 function dateForDay(day) {
   return formatDateLabel(dateForOffset(day.dateOffset));
+}
+
+function dateForDayIso(day) {
+  return toIsoDate(dateForOffset(day.dateOffset));
+}
+
+function zonedIsoDate(date, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function dayById(dayId) {
@@ -2066,6 +2092,32 @@ function ensureWeekendRotationShape() {
 function weekendOnCallRotationRule() {
   ensureWeekendRotationShape();
   return rota.config.rotations.weekendOnCall;
+}
+
+function getWeekendOnCallPersonForSlot(dayId, start, end) {
+  const day = dayById(dayId);
+  if (!day) {
+    return '';
+  }
+  const slotStart = etWallTimeToDate(day.dateOffset, start);
+  const slotEnd = etWallTimeToDate(day.dateOffset, end);
+  const weekendRule = weekendOnCallRotationRule();
+  const currentWeekendStart = etWallTimeToDate(4, weekendRule.start);
+  const currentWeekendEnd = etWallTimeToDate(7, weekendRule.end);
+  if (slotStart < currentWeekendEnd && slotEnd > currentWeekendStart) {
+    return getWeekendOwnerForWeek(rota.config.weekStart);
+  }
+
+  const previousWeekStartDate = parseIsoDate(rota.config.weekStart);
+  previousWeekStartDate.setUTCDate(previousWeekStartDate.getUTCDate() - 7);
+  const previousWeekStart = toIsoDate(previousWeekStartDate);
+  const previousWeekendStart = etWallTimeToDate(-3, weekendRule.start);
+  const previousWeekendEnd = etWallTimeToDate(0, weekendRule.end);
+  if (slotStart < previousWeekendEnd && slotEnd > previousWeekendStart) {
+    return getWeekendOwnerForWeek(previousWeekStart);
+  }
+
+  return '';
 }
 
 function weekendEligiblePeople() {

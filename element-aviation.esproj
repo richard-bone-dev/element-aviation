@@ -2,4 +2,8 @@
   <PropertyGroup>
     <StartupCommandWorkingDirectory>D:\.codex\element-aviation\</StartupCommandWorkingDirectory>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="New folder\**" />
+    <TypeScriptConfiguration Remove="New folder\**" />
+  </ItemGroup>
 </Project>
