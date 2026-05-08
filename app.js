@@ -1,3 +1,60 @@
+/**
+ * @typedef {Object} StaffMember
+ * @property {string} id
+ * @property {string} name
+ * @property {string} location
+ * @property {string} colorClass
+ */
+
+/**
+ * @typedef {Object} ShiftBlock
+ * @property {string} start
+ * @property {string} end
+ * @property {string[]} people
+ */
+
+/**
+ * @typedef {Object} OnCallBlock
+ * @property {string} startDay
+ * @property {string} start
+ * @property {string} endDay
+ * @property {string} end
+ */
+
+/**
+ * @typedef {Object} WorkingSegment
+ * @property {string} dayId
+ * @property {string} start
+ * @property {string} end
+ * @property {string} personId
+ */
+
+/**
+ * @typedef {Object} ScheduleWeek
+ * @property {string} weekStart
+ * @property {Record<string, ShiftBlock[]>} schedule
+ */
+
+/**
+ * @typedef {Object} ValidationRule
+ * @property {string} code
+ * @property {(segment: WorkingSegment) => boolean} applies
+ */
+
+/**
+ * @typedef {Object} ValidationResult
+ * @property {Array<Object>} warnings
+ * @property {Array<Object>} slotMap
+ */
+
+/**
+ * @typedef {Object} FairnessSummary
+ * @property {string} id
+ * @property {number} total
+ * @property {number} weekend
+ * @property {number} score
+ */
+
 const ROTA_DATA = {
   config: {
     weekStart: '2026-04-27',
@@ -218,18 +275,22 @@ let rota = cloneRota(ROTA_DATA);
 let activeDialogSlot = null;
 let shouldScrollGridToCurrentHour = true;
 
-const gridEl = document.getElementById('grid');
-const warningsEl = document.getElementById('warnings');
-const fairnessEl = document.getElementById('fairness');
-const dpDebugEl = document.getElementById('dpDebug');
-const configEditorEl = document.getElementById('configEditor');
-const configStatusEl = document.getElementById('configStatus');
-const editDayEl = document.getElementById('editDay');
-const peopleChecksEl = document.getElementById('peopleChecks');
-const weekendPanelEl = document.getElementById('weekendPanel');
-const weekRangeEl = document.getElementById('weekRange');
-const dialogEl = document.getElementById('cellDialog');
-const smallPanelMedia = window.matchMedia('(max-width: 720px)');
+const hasBrowserDocument = typeof document !== 'undefined';
+const hasBrowserWindow = typeof window !== 'undefined';
+let gridEl = null;
+let warningsEl = null;
+let fairnessEl = null;
+let dpDebugEl = null;
+let configEditorEl = null;
+let configStatusEl = null;
+let editDayEl = null;
+let peopleChecksEl = null;
+let weekendPanelEl = null;
+let weekRangeEl = null;
+let dialogEl = null;
+const smallPanelMedia = hasBrowserWindow && window.matchMedia
+  ? window.matchMedia('(max-width: 720px)')
+  : { matches: false };
 const panelDefaultCollapsed = {
   validation: false,
   fairness: false,
@@ -247,7 +308,20 @@ const panelSummaries = {
   'dp-debug': 'Fixed hours'
 };
 
-document.addEventListener('DOMContentLoaded', init);
+if (hasBrowserDocument) {
+  gridEl = document.getElementById('grid');
+  warningsEl = document.getElementById('warnings');
+  fairnessEl = document.getElementById('fairness');
+  dpDebugEl = document.getElementById('dpDebug');
+  configEditorEl = document.getElementById('configEditor');
+  configStatusEl = document.getElementById('configStatus');
+  editDayEl = document.getElementById('editDay');
+  peopleChecksEl = document.getElementById('peopleChecks');
+  weekendPanelEl = document.getElementById('weekendPanel');
+  weekRangeEl = document.getElementById('weekRange');
+  dialogEl = document.getElementById('cellDialog');
+  document.addEventListener('DOMContentLoaded', init);
+}
 
 function init() {
   rota.config.weekStart = mondayForDate(new Date());
@@ -261,6 +335,20 @@ function init() {
 
 function cloneRota(value) {
   return JSON.parse(JSON.stringify(value));
+}
+
+function getCanonicalRotaSource() {
+  return cloneRota(ROTA_DATA);
+}
+
+function exportRotaConfiguration(value = rota) {
+  return JSON.stringify(value, null, 2);
+}
+
+function loadRotaConfiguration(json) {
+  const parsed = typeof json === 'string' ? JSON.parse(json) : cloneRota(json);
+  assertConfigShape(parsed);
+  return parsed;
 }
 
 function bindEvents() {
@@ -1009,8 +1097,7 @@ function saveDialogSlot(event) {
 
 function applyConfig() {
   try {
-    const parsed = JSON.parse(configEditorEl.value);
-    assertConfigShape(parsed);
+    const parsed = loadRotaConfiguration(configEditorEl.value);
     rota = parsed;
     renderDayOptions();
     renderPeopleChecks(peopleChecksEl, 'form-person');
@@ -1520,7 +1607,7 @@ function calculateFairness(validation) {
 }
 
 function exportJson() {
-  downloadFile('rota-planner.json', JSON.stringify(rota, null, 2), 'application/json');
+  downloadFile('rota-planner.json', exportRotaConfiguration(), 'application/json');
 }
 
 function exportCsv() {
@@ -2265,4 +2352,45 @@ function parseIsoDate(value) {
 function csvEscape(value) {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function setRotaForTesting(value) {
+  rota = cloneRota(value);
+}
+
+function withRotaForTesting(value, callback) {
+  const previous = rota;
+  rota = cloneRota(value);
+  try {
+    return callback();
+  } finally {
+    rota = previous;
+  }
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    getCanonicalRotaSource,
+    exportRotaConfiguration,
+    loadRotaConfiguration,
+    _test: {
+      calculateFairness,
+      cloneRota,
+      expectedEarlyStartOwner,
+      expectedEveningOwner,
+      expectedWeekendOwner,
+      fixedHoursForPerson,
+      formatLocalRange,
+      formatWeekendLocalRange,
+      getAssignmentForSlot,
+      getWeekendOwnerForWeek,
+      isPeak,
+      loadRotaConfiguration,
+      rsBreakForDay,
+      setRotaForTesting,
+      validateRota,
+      validateSlot,
+      withRotaForTesting
+    }
+  };
 }
