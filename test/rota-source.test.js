@@ -5,7 +5,7 @@ const test = require('node:test');
 const app = require('../app');
 
 const { _test } = app;
-const CANONICAL_HASH = '84409d05542d9ea03c1e9e92a8c2fb10b9db2ccd2ac74524b637661d41737986';
+const CANONICAL_HASH = 'e210ddd71aed1dbf9e4ea1a9db7a2ea9f4da6e1bbb7f19e7b1a483a4f4e6c1c4';
 
 function canonicalRota() {
   return app.getCanonicalRotaSource();
@@ -23,6 +23,8 @@ test('canonical rota source data matches corrected Phase 1 assumptions', () => {
   const rota = canonicalRota();
 
   assert.equal(sourceHash(rota), CANONICAL_HASH);
+  assert.equal(rota.config.scheduleSourceTimeZone, 'America/New_York');
+  assert.equal(rota.config.rsCoverageSupport.enabled, false);
   assert.deepEqual(rota.config.coverageRules.weekendOnCall, {
     startDay: 'fri',
     start: '22:00',
@@ -66,6 +68,10 @@ test('schedule model options keep the current working model as the default', () 
   ]);
 
   assert.deepEqual(app.getScheduleModelSource('current'), canonicalRota());
+  assert.deepEqual(app.getDisplayTimezoneOptions(), [
+    { id: 'ET', label: 'ET', default: true },
+    { id: 'UK', label: 'UK', default: false }
+  ]);
 });
 
 test('Able ET model stores Able supplied hours as Eastern source data', () => {
@@ -142,6 +148,9 @@ test('Able ET model feeds validation, fairness, and weekend calculations separat
     assert.equal(warningCodes.includes('fixed-hours-missing'), false);
     assert.equal(warningCodes.includes('weekday-evening-rotation-conflict'), false);
     assert.equal(warningCodes.includes('weekday-early-start-rotation-conflict'), false);
+    assert.equal(warningCodes.includes('daily-hours-outside-range'), true);
+    assert.equal(warningCodes.includes('two-week-fairness-difference'), true);
+    assert.equal(warningCodes.includes('late-to-early'), false);
     assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '17:30', '18:00'), '');
     assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '18:00', '18:30'), 'AS');
     assert.equal(_test.formatWeekendLocalRange('Europe/London'), 'Fri 15 May, 23:00 to Mon 18 May, 09:00');
@@ -174,9 +183,9 @@ test('DP has fixed Saturday work but is not assigned weekend on-call cover', () 
     id: 'dp-sat-morning',
     label: 'Saturday fixed hours',
     days: ['Sat'],
-    start: '09:00',
-    end: '12:00',
-    timeZone: 'Europe/London',
+    start: '04:00',
+    end: '07:00',
+    timeZone: 'America/New_York',
     type: 'fixed'
   });
 
@@ -231,7 +240,7 @@ test('RS and AS both work each week while early/on-call and late patterns altern
     assert.equal(_test.expectedWeekendOwner('2026-05-18'), 'RS');
     assert.equal(_test.getAssignmentForSlot('mon', '09:30', '10:00').people.includes('RS'), true);
     assert.equal(_test.getAssignmentForSlot('mon', '16:00', '16:30').people.includes('RS'), true);
-    assert.equal(_test.getAssignmentForSlot('mon', '16:30', '17:00').people.includes('RS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '16:30', '17:00').people.includes('RS'), false);
     assert.equal(_test.getAssignmentForSlot('mon', '10:00', '10:30').people.includes('AS'), true);
     assert.equal(_test.getAssignmentForSlot('mon', '11:00', '11:30').people.includes('AS'), true);
   });
@@ -300,7 +309,7 @@ test('AS early-shift pattern matches the following RS early-shift pattern outsid
   });
 });
 
-test('DP fixed UK blocks display as date-aware Eastern equivalents', () => {
+test('DP fixed blocks are normalized to ET and UK display remains a conversion', () => {
   const rota = canonicalRota();
 
   _test.withRotaForTesting(rota, () => {
@@ -309,39 +318,41 @@ test('DP fixed UK blocks display as date-aware Eastern equivalents', () => {
         id: 'dp-weekday-main',
         label: 'weekday fixed hours',
         days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        start: '09:00',
-        end: '15:00',
-        timeZone: 'Europe/London',
+        start: '04:00',
+        end: '10:00',
+        timeZone: 'America/New_York',
         type: 'fixed'
       },
       {
         id: 'dp-mon-wed-evening',
         label: 'Mon-Wed evening fixed hours',
         days: ['Mon', 'Tue', 'Wed'],
-        start: '18:00',
-        end: '20:00',
-        timeZone: 'Europe/London',
+        start: '13:00',
+        end: '15:00',
+        timeZone: 'America/New_York',
         type: 'fixed'
       },
       {
         id: 'dp-sat-morning',
         label: 'Saturday fixed hours',
         days: ['Sat'],
-        start: '09:00',
-        end: '12:00',
-        timeZone: 'Europe/London',
+        start: '04:00',
+        end: '07:00',
+        timeZone: 'America/New_York',
         type: 'fixed'
       }
     ]);
 
     const rows = _test.getDpFixedDebugRows();
-    const mondayMain = rows.find((row) => row.sourceDay === 'Monday' && row.sourceRange === '09:00-15:00 Europe/London');
-    const mondayEvening = rows.find((row) => row.sourceDay === 'Monday' && row.sourceRange === '18:00-20:00 Europe/London');
-    const saturdayMorning = rows.find((row) => row.sourceDay === 'Saturday' && row.sourceRange === '09:00-12:00 Europe/London');
+    const mondayMain = rows.find((row) => row.sourceDay === 'Monday' && row.sourceRange === '04:00-10:00 America/New_York');
+    const mondayEvening = rows.find((row) => row.sourceDay === 'Monday' && row.sourceRange === '13:00-15:00 America/New_York');
+    const saturdayMorning = rows.find((row) => row.sourceDay === 'Saturday' && row.sourceRange === '04:00-07:00 America/New_York');
 
     assert.equal(mondayMain.convertedRange, '04:00-10:00 ET');
     assert.equal(mondayEvening.convertedRange, '13:00-15:00 ET');
     assert.equal(saturdayMorning.convertedRange, '04:00-07:00 ET');
+    assert.equal(_test.formatLocalRange(0, '04:00', '10:00', 'Europe/London'), '09:00-15:00');
+    assert.equal(_test.formatLocalRange(5, '04:00', '07:00', 'Europe/London'), '09:00-12:00');
     assert.equal(_test.getAssignmentForSlot('sat', '04:00', '04:30').people.includes('DP'), true);
     assert.equal(_test.fixedHoursForPerson('DP'), 39);
   });
@@ -364,7 +375,7 @@ test('AS childcare constraints are separate from working assignments', () => {
   });
 });
 
-test('AS is excluded from afternoon childcare and RS generated cover is visible', () => {
+test('AS childcare exclusion leaves visible coverage gaps instead of generated RS cover', () => {
   const asLateWeek = canonicalRota();
   asLateWeek.config.weekStart = '2026-05-18';
 
@@ -373,12 +384,11 @@ test('AS is excluded from afternoon childcare and RS generated cover is visible'
       const peakChildcare = _test.getAssignmentForSlot(dayId, '16:30', '17:00');
       const nonPeakChildcare = _test.getAssignmentForSlot(dayId, '17:00', '17:30');
 
-      assert.deepEqual(peakChildcare.people, ['RS']);
-      assert.deepEqual(nonPeakChildcare.people, ['RS']);
-      assert.equal(peakChildcare.details.get('RS').some((detail) => detail.source === 'rs-peak-rescue'), true);
-      assert.equal(nonPeakChildcare.details.get('RS').some((detail) => detail.source === 'rs-childcare-rescue'), true);
+      assert.deepEqual(peakChildcare.people, []);
+      assert.deepEqual(nonPeakChildcare.people, []);
       assert.equal(peakChildcare.people.includes('AS'), false);
       assert.equal(nonPeakChildcare.people.includes('AS'), false);
+      assert.equal(_test.validateSlot(dayId, '16:30', '17:00', peakChildcare.people).codes.includes('under-covered'), true);
     });
   });
 });
@@ -403,7 +413,7 @@ test('weekend on-call hours are excluded from fairness Total', () => {
   });
 });
 
-test('childcare constraints and generated rescue are excluded from normal fairness Total', () => {
+test('childcare constraints create gaps and do not add generated rescue to fairness Total', () => {
   const asLateWeek = canonicalRota();
   asLateWeek.config.weekStart = '2026-05-18';
 
@@ -414,26 +424,25 @@ test('childcare constraints and generated rescue are excluded from normal fairne
 
     assert.equal(rsScore.assigned, 35);
     assert.equal(rsScore.total, 35);
-    assert.equal(rsScore.peakRescue > 0, true);
+    assert.equal(rsScore.peakRescue, 0);
     assert.equal(asScore.assigned, 52.5);
     assert.equal(asScore.total, asScore.assigned);
     assert.equal(asScore.childcareOverrides, 0);
   });
 });
 
-test('RS peak-cover rescue is generated without rewriting normal shift templates', () => {
+test('RS peak-cover rescue is not generated and templates are not rewritten', () => {
   const nextWeek = canonicalRota();
   nextWeek.config.weekStart = '2026-05-18';
 
   _test.withRotaForTesting(nextWeek, () => {
     const before = _test.getRotaForTesting().schedule.mon;
     const assignment = _test.getAssignmentForSlot('mon', '16:30', '17:00');
-    const rescueDetails = assignment.details.get('RS') || [];
     const after = _test.getRotaForTesting().schedule.mon;
 
     assert.equal(assignment.people.includes('AS'), false);
-    assert.equal(assignment.people.includes('RS'), true);
-    assert.equal(rescueDetails.some((detail) => detail.source === 'rs-peak-rescue'), true);
+    assert.equal(assignment.people.includes('RS'), false);
+    assert.equal(_test.validateSlot('mon', '16:30', '17:00', assignment.people).codes.includes('under-covered'), true);
     assert.deepEqual(after, before);
     assert.deepEqual(after[0], { start: '09:30', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] });
     assert.deepEqual(after[1], { start: '10:00', end: '11:00', people: ['AS_LATE_FAIRNESS_START'] });

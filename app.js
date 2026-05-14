@@ -58,6 +58,9 @@
 const ROTA_DATA = {
   config: {
     weekStart: '2026-05-11',
+    scheduleModelId: 'current',
+    scheduleModelLabel: 'Current Working Model',
+    scheduleSourceTimeZone: 'America/New_York',
     masterTimeZone: 'America/New_York',
     ukTimeZone: 'Europe/London',
     slotMinutes: 30,
@@ -82,8 +85,7 @@ const ROTA_DATA = {
         homeTimeZone: 'Europe/London',
         isUkBased: true,
         colorClass: 'rs',
-        minRestHoursAfterLateFinish: 10,
-        earliestStartAfterLateFinish: '10:00'
+        weekendEligible: true
       },
       {
         id: 'DP',
@@ -103,27 +105,27 @@ const ROTA_DATA = {
             id: 'dp-weekday-main',
             label: 'weekday fixed hours',
             days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-            start: '09:00',
-            end: '15:00',
-            timeZone: 'Europe/London',
+            start: '04:00',
+            end: '10:00',
+            timeZone: 'America/New_York',
             type: 'fixed'
           },
           {
             id: 'dp-mon-wed-evening',
             label: 'Mon-Wed evening fixed hours',
             days: ['Mon', 'Tue', 'Wed'],
-            start: '18:00',
-            end: '20:00',
-            timeZone: 'Europe/London',
+            start: '13:00',
+            end: '15:00',
+            timeZone: 'America/New_York',
             type: 'fixed'
           },
           {
             id: 'dp-sat-morning',
             label: 'Saturday fixed hours',
             days: ['Sat'],
-            start: '09:00',
-            end: '12:00',
-            timeZone: 'Europe/London',
+            start: '04:00',
+            end: '07:00',
+            timeZone: 'America/New_York',
             type: 'fixed'
           }
         ]
@@ -138,8 +140,7 @@ const ROTA_DATA = {
         availability: {
           typicalStart: '09:30'
         },
-        minRestHoursAfterLateFinish: 10,
-        earliestStartAfterLateFinish: '10:00'
+        weekendEligible: true
       }
     ],
     coverageRules: {
@@ -148,7 +149,7 @@ const ROTA_DATA = {
       weekendOnCall: { startDay: 'fri', start: '22:00', endDay: 'mon', end: '04:00' }
     },
     rsCoverageSupport: {
-      enabled: true,
+      enabled: false,
       normalBreakDurationMinutes: 60,
       eveningDutyBreakDurationMinutes: 120,
       preferredBreakWindowET: { start: '14:00', end: '17:00' },
@@ -214,10 +215,18 @@ const ROTA_DATA = {
       asLateFairnessStart: 'AS_LATE_FAIRNESS_START',
       weekdayEveningOwner: 'WEEKDAY_EVENING_OWNER'
     },
-    turnaroundRules: {
+    dailyWorkingHourRules: {
       people: ['RS', 'AS'],
-      highBurdenFinishAtOrAfter: '22:00',
-      minimumRestHours: 10
+      minHours: 7,
+      maxHours: 8
+    },
+    twoWeekFairnessRules: {
+      people: ['RS', 'AS'],
+      maxDifferenceHours: 4
+    },
+    lateFinishRules: {
+      people: ['RS', 'AS'],
+      highBurdenFinishAtOrAfter: '22:00'
     },
     scoringWeights: {
       assignedHour: 1,
@@ -232,7 +241,7 @@ const ROTA_DATA = {
       weekdayEarlyStartRotationConflict: 5,
       samePersonEarlyAndEvening: 4,
       highBurdenLateHour: 2,
-      lateToEarlyTurnaround: 6
+      lateToEarlyTurnaround: 0
     },
     rightColumnPanelOrder: ['validation', 'block-editor', 'weekend', 'config', 'dp-debug']
   },
@@ -291,11 +300,17 @@ const SCHEDULE_MODELS = {
   }
 };
 const DEFAULT_SCHEDULE_MODEL_ID = 'current';
+const DISPLAY_TIMEZONES = {
+  ET: { id: 'ET', label: 'ET', timeZone: 'America/New_York' },
+  UK: { id: 'UK', label: 'UK', timeZone: 'Europe/London' }
+};
+const DEFAULT_DISPLAY_TIMEZONE_ID = 'ET';
 const scheduleModelRotaSources = Object.fromEntries(
   Object.values(SCHEDULE_MODELS).map((model) => [model.id, model.createRota()])
 );
 
 let activeScheduleModelId = DEFAULT_SCHEDULE_MODEL_ID;
+let activeDisplayTimezoneId = DEFAULT_DISPLAY_TIMEZONE_ID;
 let rota = scheduleModelRotaSources[activeScheduleModelId];
 let activeDialogSlot = null;
 let shouldScrollGridToCurrentHour = true;
@@ -314,6 +329,9 @@ let weekendPanelEl = null;
 let weekRangeEl = null;
 let dialogEl = null;
 let scheduleModelSelectorEl = null;
+let displayTimezoneSelectorEl = null;
+let plannerTitleEl = null;
+let plannerSubtitleEl = null;
 const smallPanelMedia = hasBrowserWindow && window.matchMedia
   ? window.matchMedia('(max-width: 720px)')
   : { matches: false };
@@ -347,6 +365,9 @@ if (hasBrowserDocument) {
   weekRangeEl = document.getElementById('weekRange');
   dialogEl = document.getElementById('cellDialog');
   scheduleModelSelectorEl = document.getElementById('scheduleModelSelector');
+  displayTimezoneSelectorEl = document.getElementById('displayTimezoneSelector');
+  plannerTitleEl = document.getElementById('plannerTitle');
+  plannerSubtitleEl = document.getElementById('plannerSubtitle');
   document.addEventListener('DOMContentLoaded', init);
 }
 
@@ -357,6 +378,7 @@ function init() {
   ensureWeekendRotationShape();
   initDataPanels();
   renderScheduleModelSelector();
+  renderDisplayTimezoneSelector();
   renderDayOptions();
   renderPeopleChecks(peopleChecksEl, 'form-person');
   bindEvents();
@@ -532,6 +554,14 @@ function getScheduleModelOptions() {
   }));
 }
 
+function getDisplayTimezoneOptions() {
+  return Object.values(DISPLAY_TIMEZONES).map((timeZone) => ({
+    id: timeZone.id,
+    label: timeZone.label,
+    default: timeZone.id === DEFAULT_DISPLAY_TIMEZONE_ID
+  }));
+}
+
 function getScheduleModelSource(modelId = activeScheduleModelId) {
   const model = SCHEDULE_MODELS[modelId] || SCHEDULE_MODELS[DEFAULT_SCHEDULE_MODEL_ID];
   return model.createRota();
@@ -550,6 +580,9 @@ function loadRotaConfiguration(json) {
 function bindEvents() {
   if (scheduleModelSelectorEl) {
     scheduleModelSelectorEl.addEventListener('change', changeScheduleModel);
+  }
+  if (displayTimezoneSelectorEl) {
+    displayTimezoneSelectorEl.addEventListener('change', changeDisplayTimezone);
   }
   document.getElementById('assignmentForm').addEventListener('submit', saveBlockFromForm);
   document.getElementById('clearBlock').addEventListener('click', clearBlockFromForm);
@@ -578,6 +611,20 @@ function renderScheduleModelSelector() {
   });
 }
 
+function renderDisplayTimezoneSelector() {
+  if (!displayTimezoneSelectorEl) {
+    return;
+  }
+  displayTimezoneSelectorEl.innerHTML = '';
+  getDisplayTimezoneOptions().forEach((timeZone) => {
+    const option = document.createElement('option');
+    option.value = timeZone.id;
+    option.textContent = timeZone.label;
+    option.selected = timeZone.id === activeDisplayTimezoneId;
+    displayTimezoneSelectorEl.appendChild(option);
+  });
+}
+
 function changeScheduleModel(event) {
   const requestedModelId = event.target.value;
   if (!SCHEDULE_MODELS[requestedModelId] || requestedModelId === activeScheduleModelId) {
@@ -590,6 +637,16 @@ function changeScheduleModel(event) {
   ensureWeekendRotationShape();
   renderDayOptions();
   renderPeopleChecks(peopleChecksEl, 'form-person');
+  renderAll();
+}
+
+function changeDisplayTimezone(event) {
+  const requestedTimezoneId = event.target.value;
+  if (!DISPLAY_TIMEZONES[requestedTimezoneId] || requestedTimezoneId === activeDisplayTimezoneId) {
+    return;
+  }
+
+  activeDisplayTimezoneId = requestedTimezoneId;
   renderAll();
 }
 
@@ -758,6 +815,7 @@ function panelStorageKey(panelName) {
 }
 
 function renderAll() {
+  renderPlannerDisplayCopy();
   applyRightColumnOrder();
   renderWeekNavigation();
   renderGrid();
@@ -767,6 +825,17 @@ function renderAll() {
   renderFairness(validation);
   renderDpDebugTable();
   configEditorEl.value = JSON.stringify(rota, null, 2);
+}
+
+function renderPlannerDisplayCopy() {
+  if (!plannerTitleEl || !plannerSubtitleEl) {
+    return;
+  }
+  const displayLabel = activeDisplayTimezone().label;
+  plannerTitleEl.textContent = displayLabel === 'ET' ? 'US Eastern weekly grid' : 'UK display weekly grid';
+  plannerSubtitleEl.textContent = displayLabel === 'ET'
+    ? 'Displayed in US Eastern time across the full week, with UK equivalents shown on each hour block.'
+    : 'Displayed in UK time as a conversion of the normalized US Eastern schedule.';
 }
 
 function applyRightColumnOrder() {
@@ -832,13 +901,13 @@ function renderGrid() {
 
   const corner = document.createElement('div');
   corner.className = 'grid-head';
-  corner.innerHTML = '<strong>ET</strong><span>UK equivalent</span>';
+  corner.innerHTML = `<strong>${activeDisplayTimezone().label}</strong><span>${gridEquivalentLabel()}</span>`;
   grid.appendChild(corner);
 
   days.forEach((day) => {
     const head = document.createElement('div');
     head.className = ['grid-head', isCurrentDisplayDate(day) ? 'current-date' : ''].filter(Boolean).join(' ');
-    head.innerHTML = `<strong>${day.label}</strong><span>${dateForDay(day)}</span>`;
+    head.innerHTML = `<strong>${day.label}</strong><span>${dateForDisplayDay(day)}</span>`;
     grid.appendChild(head);
   });
 
@@ -846,7 +915,7 @@ function renderGrid() {
     const timeCell = document.createElement('div');
     timeCell.className = 'time-cell';
     timeCell.dataset.slotStart = slot.start;
-    timeCell.innerHTML = `<strong>${displaySlotRange(slot)}</strong><span>${formatLocalRange(0, slot.start, slot.end, rota.config.ukTimeZone)}</span>`;
+    timeCell.innerHTML = `<strong>${displaySlotRangeForDay(0, slot)}</strong><span>${slotEquivalentLabel(0, slot)}</span>`;
     grid.appendChild(timeCell);
 
     days.forEach((day) => {
@@ -962,11 +1031,15 @@ function buildSlotValidationNote(slotIssues) {
 }
 
 function buildSlotAriaLabel(day, slot, note) {
-  return `${day.label} ${displaySlotRange(slot)} ET. ${note}`;
+  return `${day.label} ${displaySlotRangeForDay(day.dateOffset, slot)} ${activeDisplayTimezone().label}. ${note}`;
 }
 
 function displaySlotRange(slot) {
   return `${slot.start}-${slot.end === '24:00' ? '23:59' : slot.end}`;
+}
+
+function displaySlotRangeForDay(dayOffset, slot) {
+  return formatDisplayRange(dayOffset, slot.start, slot.end);
 }
 
 function isCurrentDisplayDate(day) {
@@ -1082,7 +1155,7 @@ function renderWeekendPanel() {
 
   const meta = document.createElement('div');
   meta.className = 'weekend-meta';
-  meta.textContent = `${weekendRangeLabel()} - Eligible: ${eligiblePeople.join(' / ')}. DP is excluded. Estimated burden: ${rotation.estimatedHours} on-call hours.`;
+  meta.textContent = `${weekendDisplayRangeLabel()} - ET basis: ${weekendRangeLabel()}. Eligible: ${eligiblePeople.join(' / ')}. DP is excluded. Estimated burden: ${rotation.estimatedHours} on-call hours.`;
   wrapper.append(label, meta);
   weekendPanelEl.innerHTML = '';
   weekendPanelEl.appendChild(wrapper);
@@ -1121,8 +1194,7 @@ function renderFairness(validation) {
     ['Breaks', 'For RS only: number of gaps between merged working ranges across the week.'],
     ['Longest', 'For RS only: longest continuous merged working range, in hours.'],
     ['Late hrs', 'Assigned hours in high-burden late-finish slots for UK-based people.'],
-    ['Early', 'Count of late-to-early turnaround warnings.'],
-    ['Burden', 'Weighted score using total, peak, rescue, late shift, on-call, late finish, childcare, rotation, weekend, same-person, and turnaround penalties.']
+    ['Burden', 'Weighted score using total, peak, legacy rescue, late shift, on-call, late finish, childcare, rotation, weekend, and same-person penalties.']
   ];
   const rows = scores.map((score) => `
     <tr>
@@ -1138,7 +1210,6 @@ function renderFairness(validation) {
       <td>${score.breakCount}</td>
       <td>${score.longestContinuous.toFixed(1)}</td>
       <td>${score.late.toFixed(1)}</td>
-      <td>${score.earlyAfterLateWarnings}</td>
       <td><span class="score-pill">${score.score.toFixed(1)}</span></td>
     </tr>
   `).join('');
@@ -1184,7 +1255,8 @@ function renderDpDebugTable() {
           <th>Source day</th>
           <th>Source</th>
           <th>ET day</th>
-          <th>ET converted</th>
+          <th>ET normalized</th>
+          <th>${activeDisplayTimezone().label} display</th>
           <th>Hours</th>
           <th>Visible</th>
           <th>Clipped ET</th>
@@ -1198,6 +1270,7 @@ function renderDpDebugTable() {
             <td>${row.sourceRange}</td>
             <td>${row.convertedDay}</td>
             <td>${row.convertedRange}</td>
+            <td>${row.displayRange}</td>
             <td>${row.duration.toFixed(1)}</td>
             <td>${row.overlapsVisible ? 'Yes' : 'No'}</td>
             <td>${row.clippedRange}</td>
@@ -1228,6 +1301,7 @@ function getDpFixedDebugRows() {
         sourceRange: `${block.start}-${block.end} ${sourceTimeZone}`,
         convertedDay,
         convertedRange: `${formatZonedClock(occurrence.start, rota.config.masterTimeZone)}-${formatZonedClock(occurrence.end, rota.config.masterTimeZone)} ET`,
+        displayRange: `${formatZonedClock(occurrence.start, activeDisplayTimezone().timeZone)}-${formatZonedClock(occurrence.end, activeDisplayTimezone().timeZone)} ${activeDisplayTimezone().label}`,
         duration: (occurrence.end.getTime() - occurrence.start.getTime()) / (60 * 60 * 1000),
         overlapsVisible: clips.length > 0,
         clippedRange: clips.length ? clips.map((clip) => `${clip.dayLabel} ${clip.start}-${clip.end} ET`).join(', ') : 'Not visible',
@@ -1301,8 +1375,8 @@ function clearBlockFromForm() {
 function openSlotDialog(dayId, start, end, assignment) {
   activeDialogSlot = { dayId, start, end };
   const day = dayById(dayId);
-  document.getElementById('dialogTitle').textContent = `${day.label} ${start}-${end === '24:00' ? '23:59' : end} ET`;
-  document.getElementById('dialogMeta').textContent = `UK equivalent ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`;
+  document.getElementById('dialogTitle').textContent = `${day.label} ${formatDisplayRange(day.dateOffset, start, end)} ${activeDisplayTimezone().label}`;
+  document.getElementById('dialogMeta').textContent = slotEquivalentLabel(day.dateOffset, { start, end });
   renderPeopleChecks(document.getElementById('dialogChecks'), 'dialog-person', assignment.people);
   dialogEl.showModal();
 }
@@ -1381,10 +1455,8 @@ function validateRota() {
   warnings.push(...validateWeekendRotation());
   warnings.push(...validateDpWeekendAssignments());
   warnings.push(...validateFixedWorkingBlocks());
-  warnings.push(...validateTurnaround());
-  if (validationRuleEnabled('rsWorkingPattern')) {
-    warnings.push(...validateRsWorkingPattern());
-  }
+  warnings.push(...validateDailyWorkingHours());
+  warnings.push(...validateTwoWeekFairness());
   return { warnings, slotMap };
 }
 
@@ -1502,25 +1574,25 @@ function fixedWorkingBlockValidationForPerson(personId) {
           id: 'dp-weekday-main',
           days: ['mon', 'tue', 'wed', 'thu', 'fri'],
           sourceDaysLabel: 'Monday-Friday',
-          start: '09:00',
-          end: '15:00',
-          timeZone: 'Europe/London'
+          start: '04:00',
+          end: '10:00',
+          timeZone: 'America/New_York'
         },
         {
           id: 'dp-mon-wed-evening',
           days: ['mon', 'tue', 'wed'],
           sourceDaysLabel: 'Monday-Wednesday',
-          start: '18:00',
-          end: '20:00',
-          timeZone: 'Europe/London'
+          start: '13:00',
+          end: '15:00',
+          timeZone: 'America/New_York'
         },
         {
           id: 'dp-sat-morning',
           days: ['sat'],
           sourceDaysLabel: 'Saturday',
-          start: '09:00',
-          end: '12:00',
-          timeZone: 'Europe/London'
+          start: '04:00',
+          end: '07:00',
+          timeZone: 'America/New_York'
         }
       ]
     };
@@ -1579,7 +1651,7 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
     const expectedOwner = expectedEarlyStartOwner();
     const eveningOwner = expectedEveningOwner();
     if (expectedOwner && !people.includes(expectedOwner)) {
-      addIssue('warning', 'weekday-early-start-rotation-conflict', `${day.label} ${start}-${end} ET should be owned by ${expectedOwner} under the weekday early-start rotation, unless childcare/rest protection prevents it.`, expectedOwner);
+      addIssue('warning', 'weekday-early-start-rotation-conflict', `${day.label} ${start}-${end} ET should be owned by ${expectedOwner} under the weekday early-start rotation, unless availability prevents it.`, expectedOwner);
     }
     if (eveningOwner && hasAssignmentSource({ details }, eveningOwner, 'weekday-early-rotation')) {
       addIssue('warning', 'same-person-early-and-evening', `${day.label} ${start}-${end} ET assigns ${eveningOwner} to early-start coverage even though they are the weekday late-shift owner this week.`, eveningOwner);
@@ -1587,14 +1659,14 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
   }
 
   if (people.includes('DP') && !isWithinFixedWorkingBlock('DP', dayId, start, end) && !hasManualOrOvertimeAssignment(details, 'DP')) {
-    addIssue('warning', 'dp-outside-fixed-hours', `${day.label} ${start}-${end} ET assigns DP outside fixed UK hours without manual/overtime marking.`, 'DP');
+    addIssue('warning', 'dp-outside-fixed-hours', `${day.label} ${start}-${end} ET assigns DP outside fixed hours without manual/overtime marking.`, 'DP');
   }
 
   people
     .map((personId) => personById(personId))
     .filter((person) => person && person.isUkBased)
     .forEach((person) => {
-      if (toMinutes(end) >= toMinutes(rota.config.turnaroundRules.highBurdenFinishAtOrAfter)) {
+      if (toMinutes(end) >= toMinutes(lateFinishRule().highBurdenFinishAtOrAfter)) {
         addIssue('warning', 'late-finish', `${day.label} ${start}-${end} ET is a high-burden late finish for UK-based ${person.id}.`, person.id);
       }
     });
@@ -1631,40 +1703,6 @@ function validateWeekendRotation() {
       message: `Weekend/on-call cover should alternate between ${eligible.join(' and ')}; ${weekendRangeLabel()} is expected to be ${expected}, not ${owner}.`
     });
   }
-
-  return warnings;
-}
-
-function validateTurnaround() {
-  const warnings = [];
-  const rules = rota.config.turnaroundRules;
-  const peopleToCheck = rules.people || [];
-
-  peopleToCheck.forEach((personId) => {
-    const person = personById(personId);
-    for (let index = 0; index < rota.config.days.length - 1; index += 1) {
-      const currentDay = rota.config.days[index];
-      const nextDay = rota.config.days[index + 1];
-      const currentBlocks = blocksForPerson(currentDay.id, personId);
-      const nextBlocks = blocksForPerson(nextDay.id, personId);
-      if (!currentBlocks.length || !nextBlocks.length) {
-        continue;
-      }
-      const finish = Math.max(...currentBlocks.map((block) => toMinutes(block.end)));
-      const nextStart = Math.min(...nextBlocks.map((block) => toMinutes(block.start)));
-      const restHours = (24 * 60 - finish + nextStart) / 60;
-      const earliestStart = person && person.earliestStartAfterLateFinish ? person.earliestStartAfterLateFinish : '10:00';
-      const isLateEarly = finish >= toMinutes(rules.highBurdenFinishAtOrAfter) && nextStart < toMinutes(earliestStart);
-      if (isLateEarly || restHours < rules.minimumRestHours) {
-        warnings.push({
-          level: 'warning',
-          code: 'late-to-early',
-          personId,
-          message: `${personId} has a late-to-early turnaround from ${currentDay.label} ${fromMinutes(finish)} ET to ${nextDay.label} ${fromMinutes(nextStart)} ET (${restHours.toFixed(1)}h rest).`
-        });
-      }
-    }
-  });
 
   return warnings;
 }
@@ -1717,6 +1755,112 @@ function validateRsWorkingPattern() {
   });
 
   return warnings;
+}
+
+function lateFinishRule() {
+  return {
+    people: ['RS', 'AS'],
+    highBurdenFinishAtOrAfter: '22:00',
+    ...(rota.config.lateFinishRules || {})
+  };
+}
+
+function dailyWorkingHourRule() {
+  return {
+    people: ['RS', 'AS'],
+    minHours: 7,
+    maxHours: 8,
+    ...(rota.config.dailyWorkingHourRules || {})
+  };
+}
+
+function twoWeekFairnessRule() {
+  return {
+    people: ['RS', 'AS'],
+    maxDifferenceHours: 4,
+    ...(rota.config.twoWeekFairnessRules || {})
+  };
+}
+
+function validateDailyWorkingHours() {
+  const warnings = [];
+  const rule = dailyWorkingHourRule();
+
+  rota.config.days.forEach((day) => {
+    rule.people.forEach((personId) => {
+      const hours = normalWorkingHoursForPersonOnDay(day.id, personId);
+      if (hours < rule.minHours || hours > rule.maxHours) {
+        warnings.push({
+          level: 'warning',
+          code: 'daily-hours-outside-range',
+          personId,
+          message: `${personId} is scheduled for ${hours.toFixed(1)} working hours on ${day.label}; expected ${rule.minHours}-${rule.maxHours} hours.`
+        });
+      }
+    });
+  });
+
+  return warnings;
+}
+
+function validateTwoWeekFairness() {
+  const rule = twoWeekFairnessRule();
+  const people = rule.people || [];
+  if (people.length < 2) {
+    return [];
+  }
+
+  const totals = twoWeekNormalWorkingHoursByPerson(people);
+  const [firstPerson, secondPerson] = people;
+  const difference = Math.abs((totals[firstPerson] || 0) - (totals[secondPerson] || 0));
+  if (difference <= rule.maxDifferenceHours) {
+    return [];
+  }
+
+  return [{
+    level: 'warning',
+    code: 'two-week-fairness-difference',
+    personId: firstPerson,
+    message: `${firstPerson} and ${secondPerson} differ by ${difference.toFixed(1)} normal working hours across the two-week rotation (${firstPerson}: ${(totals[firstPerson] || 0).toFixed(1)}, ${secondPerson}: ${(totals[secondPerson] || 0).toFixed(1)}). On-call hours are tracked separately.`
+  }];
+}
+
+function twoWeekNormalWorkingHoursByPerson(people) {
+  const totals = Object.fromEntries(people.map((personId) => [personId, 0]));
+  [rota.config.weekStart, addDaysIso(rota.config.weekStart, 7)].forEach((weekStart) => {
+    const weekTotals = normalWorkingHoursByPersonForWeek(weekStart, people);
+    people.forEach((personId) => {
+      totals[personId] += weekTotals[personId] || 0;
+    });
+  });
+  return totals;
+}
+
+function normalWorkingHoursByPersonForWeek(weekStart, people) {
+  const previousWeekStart = rota.config.weekStart;
+  rota.config.weekStart = weekStart;
+  try {
+    const totals = Object.fromEntries(people.map((personId) => [personId, 0]));
+    rota.config.days.forEach((day) => {
+      people.forEach((personId) => {
+        totals[personId] += normalWorkingHoursForPersonOnDay(day.id, personId);
+      });
+    });
+    return totals;
+  } finally {
+    rota.config.weekStart = previousWeekStart;
+  }
+}
+
+function normalWorkingHoursForPersonOnDay(dayId, personId) {
+  const visibleGrid = visibleGridRule();
+  return makeSlots(visibleGrid.start, visibleGrid.end).reduce((total, slot) => {
+    const assignment = getAssignmentForSlot(dayId, slot.start, slot.end);
+    if (!assignment.people.includes(personId) || hasGeneratedRescueAssignment(assignment, personId)) {
+      return total;
+    }
+    return total + durationHours(slot.start, slot.end);
+  }, 0);
 }
 
 function workingRangesForPerson(dayId, personId) {
@@ -1779,7 +1923,6 @@ function calculateFairness(validation) {
     weekdayEarlyStartRotationConflicts: 0,
     samePersonEarlyAndEveningWarnings: 0,
     lateFinishCount: 0,
-    earlyAfterLateWarnings: 0,
     score: 0
   }]));
 
@@ -1833,9 +1976,6 @@ function calculateFairness(validation) {
   }
 
   validation.warnings.forEach((warning) => {
-    if (warning.code === 'late-to-early' && scores[warning.personId]) {
-      scores[warning.personId].earlyAfterLateWarnings += 1;
-    }
     if ((warning.code === 'weekend-conflict' || warning.code === 'weekend-rotation-conflict') && scores[warning.personId]) {
       scores[warning.personId].weekendConflicts += 1;
     }
@@ -1871,8 +2011,7 @@ function calculateFairness(validation) {
       score.weekendConflicts * weights.weekendConflict +
       score.weekdayEveningRotationConflicts * weights.weekdayEveningRotationConflict +
       score.weekdayEarlyStartRotationConflicts * weights.weekdayEarlyStartRotationConflict +
-      score.samePersonEarlyAndEveningWarnings * weights.samePersonEarlyAndEvening +
-      score.earlyAfterLateWarnings * weights.lateToEarlyTurnaround;
+      score.samePersonEarlyAndEveningWarnings * weights.samePersonEarlyAndEvening;
   });
 
   return Object.values(scores);
@@ -1933,8 +2072,6 @@ function getAssignmentForSlot(dayId, start, end) {
       });
     }
   });
-  getRsPeakRescueAssignment(dayId, start, end, details).forEach((assignment) => addAssignmentDetail(details, assignment));
-  getRsChildcareRescueAssignment(dayId, start, end, details).forEach((assignment) => addAssignmentDetail(details, assignment));
   return { people: Array.from(details.keys()), details };
 }
 
@@ -1963,45 +2100,6 @@ function getFixedAssignmentsForSlot(dayId, start, end) {
         sourceTimeZone: occurrence.sourceTimeZone
       })));
   });
-}
-
-function getRsPeakRescueAssignment(dayId, start, end, details) {
-  const peak = peakCoverageRule();
-  const rule = rsCoverageSupportRule();
-  if (!rule.enabled || !isMondayToFriday(dayId) || !intersects(start, end, peak.start, peak.end)) {
-    return [];
-  }
-  if (details.has('RS') || details.size >= peak.idealPeople) {
-    return [];
-  }
-  if (isRsBreakSlot(dayId, start, end)) {
-    return [];
-  }
-  if (!isPersonAvailableForAutoAssignment('RS', dayId, start, end)) {
-    return [];
-  }
-  return [{
-    personId: 'RS',
-    source: 'rs-peak-rescue',
-    assignmentType: 'automatic'
-  }];
-}
-
-function getRsChildcareRescueAssignment(dayId, start, end, details) {
-  if (!isMondayToFriday(dayId) || expectedEveningOwner() !== 'AS' || !isEvening(start, end)) {
-    return [];
-  }
-  if (!getUnavailableBlocks('AS').some((block) => intersects(start, end, block.start, block.end))) {
-    return [];
-  }
-  if (details.has('RS') || !isPersonAvailableForAutoAssignment('RS', dayId, start, end)) {
-    return [];
-  }
-  return [{
-    personId: 'RS',
-    source: 'rs-childcare-rescue',
-    assignmentType: 'automatic'
-  }];
 }
 
 function isMondayToFriday(dayId) {
@@ -2181,17 +2279,11 @@ function getDefaultCoreAssignments(dayId, start, end) {
   if (isPersonAvailableForAutoAssignment('AS', dayId, start, end)) {
     people.push('AS');
   }
-  if (!people.length && isPersonAvailableForAutoAssignment('RS', dayId, start, end)) {
-    people.push('RS');
-  }
   return Array.from(new Set(people));
 }
 
 function isPersonAvailableForAutoAssignment(personId, dayId, start, end) {
   if (getUnavailableBlocks(personId).some((block) => intersects(start, end, block.start, block.end))) {
-    return false;
-  }
-  if ((personId === 'RS' || personId === 'AS') && violatesEarlyAfterLate(personId, dayId, start)) {
     return false;
   }
   if (personId === 'DP') {
@@ -2366,24 +2458,6 @@ function expectedWeeklyRotationOwner(rotation, weekStart = rota.config.weekStart
   return participants[index];
 }
 
-function violatesEarlyAfterLate(personId, dayId, start) {
-  const person = personById(personId);
-  if (!person || !person.earliestStartAfterLateFinish) {
-    return false;
-  }
-  const dayIndex = rota.config.days.findIndex((day) => day.id === dayId);
-  if (dayIndex <= 0) {
-    return false;
-  }
-  const previousDay = rota.config.days[dayIndex - 1];
-  const previousBlocks = blocksForPerson(previousDay.id, personId);
-  if (!previousBlocks.length) {
-    return false;
-  }
-  const latestFinish = Math.max(...previousBlocks.map((block) => toMinutes(block.end)));
-  return latestFinish >= toMinutes(rota.config.turnaroundRules.highBurdenFinishAtOrAfter) && toMinutes(start) < toMinutes(person.earliestStartAfterLateFinish);
-}
-
 function slotHasCode(slot, code) {
   return slot.issues.codes.includes(code);
 }
@@ -2414,11 +2488,13 @@ function buildSlotNote(day, start, end, people, weekendOwnerId = '') {
   });
 
   if (!ukPeople.length) {
-    notes.push('Miami local same as ET');
+    notes.push(activeDisplayTimezone().label === 'ET' ? 'Miami local same as ET' : `ET source ${formatEtRange(start, end)}`);
     return notes.join('. ');
   }
 
-  notes.push(`${ukPeople.join('/')} UK equivalent ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`);
+  notes.push(activeDisplayTimezone().label === 'ET'
+    ? `${ukPeople.join('/')} UK equivalent ${formatLocalRange(day.dateOffset, start, end, rota.config.ukTimeZone)}`
+    : `ET source ${formatEtRange(start, end)}`);
   return notes.join('. ');
 }
 
@@ -2432,6 +2508,16 @@ function isPeak(start, end, dayId = '') {
 
 function dateForDay(day) {
   return formatDateLabel(dateForOffset(day.dateOffset));
+}
+
+function dateForDisplayDay(day) {
+  const date = etWallTimeToDate(day.dateOffset, '00:00');
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: activeDisplayTimezone().timeZone,
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(date);
 }
 
 function dateForDayIso(day) {
@@ -2481,6 +2567,10 @@ function weekendRangeLabel() {
   const startDate = dateForOffset(4);
   const endDate = dateForOffset(7);
   return `${formatDateLabel(startDate)} ${rule.start} ET to ${formatDateLabel(endDate)} ${rule.end} ET`;
+}
+
+function weekendDisplayRangeLabel() {
+  return `${formatWeekendLocalRange(activeDisplayTimezone().timeZone)} ${activeDisplayTimezone().label}`;
 }
 
 function formatWeekendLocalRange(timeZone) {
@@ -2593,6 +2683,31 @@ function formatLocalRange(dayOffset, start, end, timeZone) {
   return `${formatLocalTime(dayOffset, start, timeZone)}-${formatLocalTime(dayOffset, end, timeZone)}`;
 }
 
+function activeDisplayTimezone() {
+  return DISPLAY_TIMEZONES[activeDisplayTimezoneId] || DISPLAY_TIMEZONES[DEFAULT_DISPLAY_TIMEZONE_ID];
+}
+
+function formatDisplayRange(dayOffset, start, end) {
+  if (activeDisplayTimezone().id === 'ET') {
+    return formatEtRange(start, end);
+  }
+  return formatLocalRange(dayOffset, start, end, activeDisplayTimezone().timeZone);
+}
+
+function formatEtRange(start, end) {
+  return `${start}-${end === '24:00' ? '23:59' : end}`;
+}
+
+function gridEquivalentLabel() {
+  return activeDisplayTimezone().id === 'ET' ? 'UK equivalent' : 'ET source';
+}
+
+function slotEquivalentLabel(dayOffset, slot) {
+  return activeDisplayTimezone().id === 'ET'
+    ? `UK equivalent ${formatLocalRange(dayOffset, slot.start, slot.end, rota.config.ukTimeZone)}`
+    : `ET source ${formatEtRange(slot.start, slot.end)}`;
+}
+
 function formatLocalTime(dayOffset, time, timeZone) {
   const date = etWallTimeToDate(dayOffset, time);
   return new Intl.DateTimeFormat('en-GB', {
@@ -2692,6 +2807,12 @@ function parseIsoDate(value) {
   return new Date(Date.UTC(year, month - 1, day));
 }
 
+function addDaysIso(value, days) {
+  const date = parseIsoDate(value);
+  date.setUTCDate(date.getUTCDate() + days);
+  return toIsoDate(date);
+}
+
 function csvEscape(value) {
   const text = String(value);
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
@@ -2719,6 +2840,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getCanonicalRotaSource,
     getScheduleModelOptions,
+    getDisplayTimezoneOptions,
     getScheduleModelSource,
     exportRotaConfiguration,
     loadRotaConfiguration,
@@ -2729,6 +2851,7 @@ if (typeof module !== 'undefined' && module.exports) {
       expectedEveningOwner,
       expectedWeekendOwner,
       fixedHoursForPerson,
+      formatDisplayRange,
       formatLocalRange,
       formatWeekendLocalRange,
       getAssignmentForSlot,
@@ -2738,7 +2861,9 @@ if (typeof module !== 'undefined' && module.exports) {
       getWeekendOwnerForWeek,
       isPeak,
       loadRotaConfiguration,
+      normalWorkingHoursForPersonOnDay,
       rsBreakForDay,
+      twoWeekNormalWorkingHoursByPerson,
       setRotaForTesting,
       validateRota,
       validateSlot,
