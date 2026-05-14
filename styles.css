@@ -229,6 +229,10 @@ menu {
   min-width: 190px;
 }
 
+.schedule-model-control #displayTimezoneSelector {
+  min-width: 76px;
+}
+
 .week-nav button {
   flex: 0 0 auto;
   min-height: 34px;
