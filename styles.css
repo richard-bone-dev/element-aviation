@@ -211,6 +211,24 @@ menu {
   white-space: nowrap;
 }
 
+.schedule-model-control {
+  align-items: center;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.schedule-model-control span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.schedule-model-control select {
+  min-width: 190px;
+}
+
 .week-nav button {
   flex: 0 0 auto;
   min-height: 34px;
@@ -789,6 +807,7 @@ menu {
 
   .legend,
   .week-nav,
+  .schedule-model-control,
   .toolbar-group {
     justify-content: flex-start;
   }
@@ -814,9 +833,16 @@ menu {
 
   .heading-tools,
   .legend,
-  .week-nav {
+  .week-nav,
+  .schedule-model-control {
     justify-items: stretch;
     justify-content: flex-start;
+  }
+
+  .schedule-model-control {
+    align-items: stretch;
+    flex-direction: column;
+    white-space: normal;
   }
 
   .header-actions,

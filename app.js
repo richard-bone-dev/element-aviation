@@ -278,7 +278,25 @@ const ROTA_DATA = {
   }
 };
 
-let rota = cloneRota(ROTA_DATA);
+const SCHEDULE_MODELS = {
+  current: {
+    id: 'current',
+    label: 'Current Working Model',
+    createRota: () => cloneRota(ROTA_DATA)
+  },
+  ableEt: {
+    id: 'ableEt',
+    label: 'Able ET Model',
+    createRota: createAbleEtRotaData
+  }
+};
+const DEFAULT_SCHEDULE_MODEL_ID = 'current';
+const scheduleModelRotaSources = Object.fromEntries(
+  Object.values(SCHEDULE_MODELS).map((model) => [model.id, model.createRota()])
+);
+
+let activeScheduleModelId = DEFAULT_SCHEDULE_MODEL_ID;
+let rota = scheduleModelRotaSources[activeScheduleModelId];
 let activeDialogSlot = null;
 let shouldScrollGridToCurrentHour = true;
 
@@ -295,6 +313,7 @@ let peopleChecksEl = null;
 let weekendPanelEl = null;
 let weekRangeEl = null;
 let dialogEl = null;
+let scheduleModelSelectorEl = null;
 const smallPanelMedia = hasBrowserWindow && window.matchMedia
   ? window.matchMedia('(max-width: 720px)')
   : { matches: false };
@@ -327,13 +346,17 @@ if (hasBrowserDocument) {
   weekendPanelEl = document.getElementById('weekendPanel');
   weekRangeEl = document.getElementById('weekRange');
   dialogEl = document.getElementById('cellDialog');
+  scheduleModelSelectorEl = document.getElementById('scheduleModelSelector');
   document.addEventListener('DOMContentLoaded', init);
 }
 
 function init() {
-  rota.config.weekStart = mondayForDate(new Date());
+  Object.values(scheduleModelRotaSources).forEach((modelRota) => {
+    modelRota.config.weekStart = mondayForDate(new Date());
+  });
   ensureWeekendRotationShape();
   initDataPanels();
+  renderScheduleModelSelector();
   renderDayOptions();
   renderPeopleChecks(peopleChecksEl, 'form-person');
   bindEvents();
@@ -344,8 +367,174 @@ function cloneRota(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function createAbleEtRotaData() {
+  const able = cloneRota(ROTA_DATA);
+  able.config.scheduleModelId = 'ableEt';
+  able.config.scheduleModelLabel = 'Able ET Model';
+  able.config.scheduleSourceTimeZone = 'America/New_York';
+  able.config.visibleGridStart = '04:00';
+  able.config.visibleGridEnd = '23:00';
+  able.config.businessCoverageStart = '04:00';
+  able.config.businessCoverageEnd = '23:00';
+  able.config.peakCoverageStart = '11:00';
+  able.config.peakCoverageEnd = '17:00';
+  able.config.coverageRules.weekday = { start: '04:00', end: '23:00', minPeople: 1 };
+  able.config.coverageRules.peak = { start: '11:00', end: '17:00', idealPeople: 2 };
+  able.config.coverageRules.weekendOnCall = { startDay: 'fri', start: '18:00', endDay: 'mon', end: '04:00' };
+  able.config.rsCoverageSupport = { ...able.config.rsCoverageSupport, enabled: false };
+  able.config.availabilityRules = {
+    DP: {
+      fixedHoursAreAutomaticOnly: true
+    }
+  };
+  able.config.validationRules = {
+    weekdayRotations: false,
+    rsWorkingPattern: false,
+    dpFixedWorkingBlockSource: true
+  };
+  able.config.fixedWorkingBlockValidation = {
+    DP: {
+      expectedTotalHours: 54,
+      contractHoursTarget: 54,
+      requiredBlocks: [
+        {
+          id: 'able-dp-weekday-morning',
+          days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+          sourceDaysLabel: 'Monday-Friday',
+          start: '04:00',
+          end: '10:00',
+          timeZone: 'America/New_York'
+        },
+        {
+          id: 'able-dp-weekday-afternoon',
+          days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+          sourceDaysLabel: 'Monday-Friday',
+          start: '13:00',
+          end: '17:00',
+          timeZone: 'America/New_York'
+        },
+        {
+          id: 'able-dp-sat-morning',
+          days: ['sat'],
+          sourceDaysLabel: 'Saturday',
+          start: '04:30',
+          end: '08:30',
+          timeZone: 'America/New_York'
+        }
+      ]
+    }
+  };
+
+  able.config.people = able.config.people.map((person) => {
+    if (person.id === 'DP') {
+      return {
+        ...person,
+        timeZone: 'America/New_York',
+        homeTimeZone: 'America/New_York',
+        contractHoursPerWeek: 54,
+        fixedWorkingBlocks: [
+          {
+            id: 'able-dp-weekday-morning',
+            label: 'Able weekday morning fixed hours',
+            days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            start: '04:00',
+            end: '10:00',
+            timeZone: 'America/New_York',
+            type: 'fixed'
+          },
+          {
+            id: 'able-dp-weekday-afternoon',
+            label: 'Able weekday afternoon fixed hours',
+            days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            start: '13:00',
+            end: '17:00',
+            timeZone: 'America/New_York',
+            type: 'fixed'
+          },
+          {
+            id: 'able-dp-sat-morning',
+            label: 'Able Saturday fixed hours',
+            days: ['Sat'],
+            start: '04:30',
+            end: '08:30',
+            timeZone: 'America/New_York',
+            type: 'fixed'
+          }
+        ]
+      };
+    }
+    return person;
+  });
+
+  able.config.rotations.weekdayEvenings = {
+    start: '18:00',
+    end: '23:00',
+    participants: ['RS', 'AS'],
+    baseWeekStart: '2026-05-11',
+    startingPerson: 'RS',
+    alternatesWeekly: false
+  };
+  able.config.rotations.weekdayEarlyStarts = {
+    days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+    start: '08:00',
+    end: '16:00',
+    timeZone: 'America/New_York',
+    participants: ['RS', 'AS'],
+    baseWeekStart: '2026-05-11',
+    startingPerson: 'RS',
+    alternatesWeekly: false
+  };
+  able.config.rotations.weekendOnCall = {
+    startDay: 'fri',
+    start: '18:00',
+    endDay: 'mon',
+    end: '04:00',
+    timeZone: 'America/New_York',
+    baseWeekStart: '2026-05-11',
+    assignedTo: 'AS',
+    eligiblePeople: ['RS', 'AS'],
+    participants: ['RS', 'AS'],
+    rotationOrder: ['RS', 'AS'],
+    backupOrder: ['RS', 'AS'],
+    alternatesWeekly: true,
+    excluded: ['DP'],
+    assignments: {
+      '2026-05-11': 'AS'
+    },
+    estimatedHours: 58
+  };
+
+  const weekdayAbleBlocks = [
+    { start: '08:00', end: '16:00', people: ['RS'] },
+    { start: '18:00', end: '23:00', people: ['RS'] },
+    { start: '09:00', end: '15:00', people: ['AS'] },
+    { start: '18:00', end: '23:00', people: ['AS'] }
+  ];
+  able.schedule = {
+    mon: cloneRota(weekdayAbleBlocks),
+    tue: cloneRota(weekdayAbleBlocks),
+    wed: cloneRota(weekdayAbleBlocks),
+    thu: cloneRota(weekdayAbleBlocks),
+    fri: cloneRota(weekdayAbleBlocks)
+  };
+  return able;
+}
+
 function getCanonicalRotaSource() {
   return cloneRota(ROTA_DATA);
+}
+
+function getScheduleModelOptions() {
+  return Object.values(SCHEDULE_MODELS).map((model) => ({
+    id: model.id,
+    label: model.label,
+    default: model.id === DEFAULT_SCHEDULE_MODEL_ID
+  }));
+}
+
+function getScheduleModelSource(modelId = activeScheduleModelId) {
+  const model = SCHEDULE_MODELS[modelId] || SCHEDULE_MODELS[DEFAULT_SCHEDULE_MODEL_ID];
+  return model.createRota();
 }
 
 function exportRotaConfiguration(value = rota) {
@@ -359,6 +548,9 @@ function loadRotaConfiguration(json) {
 }
 
 function bindEvents() {
+  if (scheduleModelSelectorEl) {
+    scheduleModelSelectorEl.addEventListener('change', changeScheduleModel);
+  }
   document.getElementById('assignmentForm').addEventListener('submit', saveBlockFromForm);
   document.getElementById('clearBlock').addEventListener('click', clearBlockFromForm);
   document.getElementById('applyConfig').addEventListener('click', applyConfig);
@@ -370,6 +562,35 @@ function bindEvents() {
   document.getElementById('dialogCancel').addEventListener('click', () => dialogEl.close());
   document.getElementById('dialogSave').addEventListener('click', saveDialogSlot);
   bindPanelModals();
+}
+
+function renderScheduleModelSelector() {
+  if (!scheduleModelSelectorEl) {
+    return;
+  }
+  scheduleModelSelectorEl.innerHTML = '';
+  getScheduleModelOptions().forEach((model) => {
+    const option = document.createElement('option');
+    option.value = model.id;
+    option.textContent = model.label;
+    option.selected = model.id === activeScheduleModelId;
+    scheduleModelSelectorEl.appendChild(option);
+  });
+}
+
+function changeScheduleModel(event) {
+  const requestedModelId = event.target.value;
+  if (!SCHEDULE_MODELS[requestedModelId] || requestedModelId === activeScheduleModelId) {
+    return;
+  }
+
+  scheduleModelRotaSources[activeScheduleModelId] = rota;
+  activeScheduleModelId = requestedModelId;
+  rota = scheduleModelRotaSources[activeScheduleModelId];
+  ensureWeekendRotationShape();
+  renderDayOptions();
+  renderPeopleChecks(peopleChecksEl, 'form-person');
+  renderAll();
 }
 
 function bindPanelModals() {
@@ -961,7 +1182,7 @@ function renderDpDebugTable() {
       <thead>
         <tr>
           <th>Source day</th>
-          <th>UK source</th>
+          <th>Source</th>
           <th>ET day</th>
           <th>ET converted</th>
           <th>Hours</th>
@@ -1106,6 +1327,7 @@ function applyConfig() {
   try {
     const parsed = loadRotaConfiguration(configEditorEl.value);
     rota = parsed;
+    scheduleModelRotaSources[activeScheduleModelId] = rota;
     renderDayOptions();
     renderPeopleChecks(peopleChecksEl, 'form-person');
     configStatusEl.textContent = 'Config applied.';
@@ -1160,7 +1382,9 @@ function validateRota() {
   warnings.push(...validateDpWeekendAssignments());
   warnings.push(...validateFixedWorkingBlocks());
   warnings.push(...validateTurnaround());
-  warnings.push(...validateRsWorkingPattern());
+  if (validationRuleEnabled('rsWorkingPattern')) {
+    warnings.push(...validateRsWorkingPattern());
+  }
   return { warnings, slotMap };
 }
 
@@ -1173,7 +1397,7 @@ function validateDpWeekendAssignments() {
           level: 'error',
           code: 'dp-weekend-assignment',
           personId: 'DP',
-          message: `DP is assigned on ${dayId.toUpperCase()} ${block.start}-${block.end}, outside the approved Saturday 04:00-07:00 ET fixed block.`
+          message: `DP is assigned on ${dayId.toUpperCase()} ${block.start}-${block.end}, outside the approved fixed working blocks.`
         });
       }
     });
@@ -1210,37 +1434,16 @@ function validateFixedWorkingBlocks() {
 
 function validateDpFixedWorkingBlockSource() {
   const warnings = [];
+  if (!validationRuleEnabled('dpFixedWorkingBlockSource')) {
+    return warnings;
+  }
   const dp = personById('DP');
   if (!dp) {
     return warnings;
   }
 
-  const requiredBlocks = [
-    {
-      id: 'dp-weekday-main',
-      days: ['mon', 'tue', 'wed', 'thu', 'fri'],
-      sourceDaysLabel: 'Monday-Friday',
-      start: '09:00',
-      end: '15:00',
-      timeZone: 'Europe/London'
-    },
-    {
-      id: 'dp-mon-wed-evening',
-      days: ['mon', 'tue', 'wed'],
-      sourceDaysLabel: 'Monday-Wednesday',
-      start: '18:00',
-      end: '20:00',
-      timeZone: 'Europe/London'
-    },
-    {
-      id: 'dp-sat-morning',
-      days: ['sat'],
-      sourceDaysLabel: 'Saturday',
-      start: '09:00',
-      end: '12:00',
-      timeZone: 'Europe/London'
-    }
-  ];
+  const validation = fixedWorkingBlockValidationForPerson('DP');
+  const requiredBlocks = validation.requiredBlocks;
 
   requiredBlocks.forEach((required) => {
     const block = (dp.fixedWorkingBlocks || []).find((candidate) => candidate.id === required.id);
@@ -1262,26 +1465,72 @@ function validateDpFixedWorkingBlockSource() {
   });
 
   const fixedHours = fixedHoursForPerson('DP');
-  if (Math.abs(fixedHours - 39) > 0.01) {
+  if (Math.abs(fixedHours - validation.expectedTotalHours) > 0.01) {
     warnings.push({
       level: 'warning',
       code: 'dp-fixed-hours-total',
       personId: 'DP',
-      message: `DP fixed scheduled hours should total 39.0, but currently total ${fixedHours.toFixed(1)}.`
+      message: `DP fixed scheduled hours should total ${validation.expectedTotalHours.toFixed(1)}, but currently total ${fixedHours.toFixed(1)}.`
     });
   }
 
   const dpContract = dp.contractHoursPerWeek || 0;
-  if (dpContract !== 42) {
+  if (dpContract !== validation.contractHoursTarget) {
     warnings.push({
       level: 'warning',
       code: 'dp-contract-target',
       personId: 'DP',
-      message: `DP contract target should display as 42 hours, but is configured as ${dpContract}.`
+      message: `DP contract target should display as ${validation.contractHoursTarget} hours, but is configured as ${dpContract}.`
     });
   }
 
   return warnings;
+}
+
+function fixedWorkingBlockValidationForPerson(personId) {
+  const configured = rota.config.fixedWorkingBlockValidation && rota.config.fixedWorkingBlockValidation[personId];
+  if (configured) {
+    return configured;
+  }
+
+  if (personId === 'DP') {
+    return {
+      expectedTotalHours: 39,
+      contractHoursTarget: 42,
+      requiredBlocks: [
+        {
+          id: 'dp-weekday-main',
+          days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+          sourceDaysLabel: 'Monday-Friday',
+          start: '09:00',
+          end: '15:00',
+          timeZone: 'Europe/London'
+        },
+        {
+          id: 'dp-mon-wed-evening',
+          days: ['mon', 'tue', 'wed'],
+          sourceDaysLabel: 'Monday-Wednesday',
+          start: '18:00',
+          end: '20:00',
+          timeZone: 'Europe/London'
+        },
+        {
+          id: 'dp-sat-morning',
+          days: ['sat'],
+          sourceDaysLabel: 'Saturday',
+          start: '09:00',
+          end: '12:00',
+          timeZone: 'Europe/London'
+        }
+      ]
+    };
+  }
+
+  return {
+    expectedTotalHours: 0,
+    contractHoursTarget: 0,
+    requiredBlocks: []
+  };
 }
 
 function validateSlot(dayId, start, end, people, details = new Map()) {
@@ -1319,14 +1568,14 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
     }
   });
 
-  if (isEvening(start, end)) {
+  if (validationRuleEnabled('weekdayRotations') && isEvening(start, end)) {
     const expectedOwner = expectedEveningOwner();
     if (expectedOwner && !people.includes(expectedOwner)) {
       addIssue('warning', 'weekday-evening-rotation-conflict', `${day.label} ${start}-${end} ET should be owned by ${expectedOwner} under the weekday late-shift rotation; DP support does not satisfy this RS/AS rule.`, expectedOwner);
     }
   }
 
-  if (isEarlyStart(start, end)) {
+  if (validationRuleEnabled('weekdayRotations') && isEarlyStart(start, end)) {
     const expectedOwner = expectedEarlyStartOwner();
     const eveningOwner = expectedEveningOwner();
     if (expectedOwner && !people.includes(expectedOwner)) {
@@ -1351,6 +1600,11 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
     });
 
   return { error, warning, codes, messages };
+}
+
+function validationRuleEnabled(ruleName) {
+  const rules = rota.config.validationRules || {};
+  return rules[ruleName] !== false;
 }
 
 function validateWeekendRotation() {
@@ -2464,6 +2718,8 @@ function withRotaForTesting(value, callback) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     getCanonicalRotaSource,
+    getScheduleModelOptions,
+    getScheduleModelSource,
     exportRotaConfiguration,
     loadRotaConfiguration,
     _test: {
