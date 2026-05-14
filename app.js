@@ -420,10 +420,7 @@ function createAbleEtRotaData() {
     eveningDutyBreakStart: '14:00'
   };
   able.config.computedAssignmentTokens = {
-    defaultCoreAssignments: 'DEFAULT_CORE_ASSIGNMENTS',
-    weekdayEarlyOwner: 'WEEKDAY_EARLY_OWNER',
-    asLateFairnessStart: 'AS_LATE_FAIRNESS_START',
-    weekdayEveningOwner: 'WEEKDAY_EVENING_OWNER'
+    ableWeekdayEveningOwner: 'ABLE_WEEKDAY_EVENING_OWNER'
   };
   able.config.availabilityRules = {
     DP: {
@@ -437,8 +434,8 @@ function createAbleEtRotaData() {
   };
   able.config.fixedWorkingBlockValidation = {
     DP: {
-      expectedTotalHours: 54,
-      contractHoursTarget: 54,
+      expectedTotalHours: 40,
+      contractHoursTarget: 40,
       requiredBlocks: [
         {
           id: 'able-dp-weekday-morning',
@@ -450,10 +447,10 @@ function createAbleEtRotaData() {
         },
         {
           id: 'able-dp-weekday-afternoon',
-          days: ['mon', 'tue', 'wed', 'thu', 'fri'],
-          sourceDaysLabel: 'Monday-Friday',
+          days: ['mon', 'tue', 'wed'],
+          sourceDaysLabel: 'Monday-Wednesday',
           start: '13:00',
-          end: '17:00',
+          end: '15:00',
           timeZone: 'America/New_York'
         },
         {
@@ -474,7 +471,7 @@ function createAbleEtRotaData() {
         ...person,
         timeZone: 'America/New_York',
         homeTimeZone: 'America/New_York',
-        contractHoursPerWeek: 54,
+        contractHoursPerWeek: 40,
         fixedWorkingBlocks: [
           {
             id: 'able-dp-weekday-morning',
@@ -488,9 +485,9 @@ function createAbleEtRotaData() {
           {
             id: 'able-dp-weekday-afternoon',
             label: 'Able weekday afternoon fixed hours',
-            days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+            days: ['Mon', 'Tue', 'Wed'],
             start: '13:00',
-            end: '17:00',
+            end: '15:00',
             timeZone: 'America/New_York',
             type: 'fixed'
           },
@@ -515,7 +512,7 @@ function createAbleEtRotaData() {
     participants: ['RS', 'AS'],
     baseWeekStart: '2026-05-11',
     startingPerson: 'RS',
-    alternatesWeekly: false
+    alternatesWeekly: true
   };
   able.config.rotations.weekdayEarlyStarts = {
     days: ['mon', 'tue', 'wed', 'thu', 'fri'],
@@ -534,31 +531,37 @@ function createAbleEtRotaData() {
     end: '04:00',
     timeZone: 'America/New_York',
     baseWeekStart: '2026-05-11',
-    assignedTo: 'AS',
+    assignedTo: 'RS',
     eligiblePeople: ['RS', 'AS'],
     participants: ['RS', 'AS'],
     rotationOrder: ['RS', 'AS'],
     backupOrder: ['RS', 'AS'],
     alternatesWeekly: true,
     excluded: ['DP'],
-    assignments: {
-      '2026-05-11': 'AS'
-    },
-    estimatedHours: 58
+    assignments: {},
+    activeWindows: [
+      { startDay: 'fri', start: '18:00', endDay: 'sat', end: '04:00' },
+      { startDay: 'sat', start: '18:00', endDay: 'sun', end: '04:00' },
+      { startDay: 'sun', start: '18:00', endDay: 'mon', end: '04:00' }
+    ],
+    estimatedHours: 30
   };
 
-  const weekdayAbleBlocks = [
+  const weekdayAbleBlocksWithEvening = [
     { start: '08:00', end: '16:00', people: ['RS'] },
-    { start: '18:00', end: '23:00', people: ['RS'] },
     { start: '09:00', end: '15:00', people: ['AS'] },
-    { start: '18:00', end: '23:00', people: ['AS'] }
+    { start: '18:00', end: '23:00', people: ['ABLE_WEEKDAY_EVENING_OWNER'] }
+  ];
+  const fridayAbleBlocks = [
+    { start: '08:00', end: '16:00', people: ['RS'] },
+    { start: '09:00', end: '15:00', people: ['AS'] }
   ];
   able.schedule = {
-    mon: cloneRota(weekdayAbleBlocks),
-    tue: cloneRota(weekdayAbleBlocks),
-    wed: cloneRota(weekdayAbleBlocks),
-    thu: cloneRota(weekdayAbleBlocks),
-    fri: cloneRota(weekdayAbleBlocks)
+    mon: cloneRota(weekdayAbleBlocksWithEvening),
+    tue: cloneRota(weekdayAbleBlocksWithEvening),
+    wed: cloneRota(weekdayAbleBlocksWithEvening),
+    thu: cloneRota(weekdayAbleBlocksWithEvening),
+    fri: cloneRota(fridayAbleBlocks)
   };
   return able;
 }
@@ -2187,6 +2190,17 @@ function resolveAssignmentEntry(dayId, start, end, personId, block) {
       assignmentType: 'automatic'
     }));
   }
+  if (personId === tokens.ableWeekdayEveningOwner) {
+    const owner = expectedAbleWeekdayEveningOwner();
+    if (!owner) {
+      return [];
+    }
+    return [{
+      personId: owner,
+      source: 'able-weekday-evening-source',
+      assignmentType: 'configured'
+    }];
+  }
   if (personId === tokens.weekdayEarlyOwner) {
     const owner = expectedEarlyStartOwner();
     if (!isPersonAvailableForAutoAssignment(owner, dayId, start, end)) {
@@ -2513,6 +2527,10 @@ function expectedEveningOwner(weekStart = rota.config.weekStart) {
   return participants[index];
 }
 
+function expectedAbleWeekdayEveningOwner(weekStart = rota.config.weekStart) {
+  return expectedWeeklyRotationOwner(weekdayEveningRotationRule(), weekStart);
+}
+
 function expectedEarlyStartOwner(weekStart = rota.config.weekStart) {
   const rotation = weekdayEarlyStartRotationRule();
   if (rotation.deriveAsOppositeOf === 'weekdayEvenings') {
@@ -2649,10 +2667,11 @@ function mondayForDate(date) {
 }
 
 function weekendRangeLabel() {
-  const rule = weekendOnCallRule();
-  const startDate = dateForOffset(4);
-  const endDate = dateForOffset(7);
-  return `${formatDateLabel(startDate)} ${rule.start} ET to ${formatDateLabel(endDate)} ${rule.end} ET`;
+  return weekendOnCallWindows().map((window) => {
+    const startDate = dateForOffset(dayOffsetForWindowDay(window.startDay, false));
+    const endDate = dateForOffset(dayOffsetForWindowDay(window.endDay, true, window.startDay));
+    return `${formatDateLabel(startDate)} ${window.start} ET to ${formatDateLabel(endDate)} ${window.end} ET`;
+  }).join('; ');
 }
 
 function weekendDisplayRangeLabel() {
@@ -2660,10 +2679,11 @@ function weekendDisplayRangeLabel() {
 }
 
 function formatWeekendLocalRange(timeZone) {
-  const rule = weekendOnCallRule();
-  const start = formatLocalDateTime(4, rule.start, timeZone);
-  const end = formatLocalDateTime(7, rule.end, timeZone);
-  return `${start} to ${end}`;
+  return weekendOnCallWindows().map((window) => {
+    const start = formatLocalDateTime(dayOffsetForWindowDay(window.startDay, false), window.start, timeZone);
+    const end = formatLocalDateTime(dayOffsetForWindowDay(window.endDay, true, window.startDay), window.end, timeZone);
+    return `${start} to ${end}`;
+  }).join('; ');
 }
 
 function ensureWeekendRotationShape() {
@@ -2697,26 +2717,55 @@ function weekendOnCallRotationRule() {
   return rota.config.rotations.weekendOnCall;
 }
 
+function weekendOnCallWindows() {
+  const rule = weekendOnCallRotationRule();
+  return Array.isArray(rule.activeWindows) && rule.activeWindows.length ? rule.activeWindows : [rule];
+}
+
+function dayOffsetForWindowDay(dayId, isEndDay = false, startDayId = '') {
+  const offsets = {
+    mon: 0,
+    tue: 1,
+    wed: 2,
+    thu: 3,
+    fri: 4,
+    sat: 5,
+    sun: 6
+  };
+  let offset = offsets[normalizeDayId(dayId)] || 0;
+  if (isEndDay && startDayId) {
+    const startOffset = offsets[normalizeDayId(startDayId)] || 0;
+    if (offset <= startOffset) {
+      offset += 7;
+    }
+  }
+  return offset;
+}
+
+function slotOverlapsWeekendWindow(dayOffset, start, end, window, weekOffset = 0) {
+  const slotStart = etWallTimeToDate(dayOffset, start);
+  const slotEnd = etWallTimeToDate(dayOffset, end);
+  const windowStartOffset = dayOffsetForWindowDay(window.startDay, false) + weekOffset;
+  const windowEndOffset = dayOffsetForWindowDay(window.endDay, true, window.startDay) + weekOffset;
+  const windowStart = etWallTimeToDate(windowStartOffset, window.start);
+  const windowEnd = etWallTimeToDate(windowEndOffset, window.end);
+  return slotStart < windowEnd && slotEnd > windowStart;
+}
+
 function getWeekendOnCallPersonForSlot(dayId, start, end) {
   const day = dayById(dayId);
   if (!day) {
     return '';
   }
-  const slotStart = etWallTimeToDate(day.dateOffset, start);
-  const slotEnd = etWallTimeToDate(day.dateOffset, end);
-  const weekendRule = weekendOnCallRotationRule();
-  const currentWeekendStart = etWallTimeToDate(4, weekendRule.start);
-  const currentWeekendEnd = etWallTimeToDate(7, weekendRule.end);
-  if (slotStart < currentWeekendEnd && slotEnd > currentWeekendStart) {
+  const windows = weekendOnCallWindows();
+  if (windows.some((window) => slotOverlapsWeekendWindow(day.dateOffset, start, end, window))) {
     return getWeekendOwnerForWeek(rota.config.weekStart);
   }
 
   const previousWeekStartDate = parseIsoDate(rota.config.weekStart);
   previousWeekStartDate.setUTCDate(previousWeekStartDate.getUTCDate() - 7);
   const previousWeekStart = toIsoDate(previousWeekStartDate);
-  const previousWeekendStart = etWallTimeToDate(-3, weekendRule.start);
-  const previousWeekendEnd = etWallTimeToDate(0, weekendRule.end);
-  if (slotStart < previousWeekendEnd && slotEnd > previousWeekendStart) {
+  if (windows.some((window) => slotOverlapsWeekendWindow(day.dateOffset, start, end, window, -7))) {
     return getWeekendOwnerForWeek(previousWeekStart);
   }
 

@@ -87,10 +87,7 @@ test('Able ET model stores Able supplied hours as Eastern source data', () => {
   assert.equal(able.config.scheduleSourceTimeZone, 'America/New_York');
   assert.equal(able.config.businessCoverageEnd, '23:00');
   assert.deepEqual(able.config.computedAssignmentTokens, {
-    defaultCoreAssignments: 'DEFAULT_CORE_ASSIGNMENTS',
-    weekdayEarlyOwner: 'WEEKDAY_EARLY_OWNER',
-    asLateFairnessStart: 'AS_LATE_FAIRNESS_START',
-    weekdayEveningOwner: 'WEEKDAY_EVENING_OWNER'
+    ableWeekdayEveningOwner: 'ABLE_WEEKDAY_EVENING_OWNER'
   });
   assert.equal(able.config.rsCoverageSupport.normalBreakStart, '14:00');
   assert.equal(able.config.rsCoverageSupport.eveningDutyBreakStart, '14:00');
@@ -113,9 +110,9 @@ test('Able ET model stores Able supplied hours as Eastern source data', () => {
     {
       id: 'able-dp-weekday-afternoon',
       label: 'Able weekday afternoon fixed hours',
-      days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      days: ['Mon', 'Tue', 'Wed'],
       start: '13:00',
-      end: '17:00',
+      end: '15:00',
       timeZone: 'America/New_York',
       type: 'fixed'
     },
@@ -131,24 +128,41 @@ test('Able ET model stores Able supplied hours as Eastern source data', () => {
   ]);
   assert.deepEqual(able.schedule.mon, [
     { start: '08:00', end: '16:00', people: ['RS'] },
-    { start: '18:00', end: '23:00', people: ['RS'] },
     { start: '09:00', end: '15:00', people: ['AS'] },
-    { start: '18:00', end: '23:00', people: ['AS'] }
+    { start: '18:00', end: '23:00', people: ['ABLE_WEEKDAY_EVENING_OWNER'] }
+  ]);
+  assert.deepEqual(able.schedule.fri, [
+    { start: '08:00', end: '16:00', people: ['RS'] },
+    { start: '09:00', end: '15:00', people: ['AS'] }
   ]);
 });
 
 test('Able ET model renders ET source slots with date-aware UK equivalents', () => {
   const able = app.getScheduleModelSource('ableEt');
+  const ableWeekB = app.getScheduleModelSource('ableEt');
+  ableWeekB.config.weekStart = '2026-05-18';
 
   _test.withRotaForTesting(able, () => {
     assert.equal(_test.getAssignmentForSlot('mon', '04:00', '04:30').people.includes('DP'), true);
     assert.equal(_test.getAssignmentForSlot('mon', '09:00', '09:30').people.includes('RS'), true);
     assert.equal(_test.getAssignmentForSlot('mon', '09:00', '09:30').people.includes('AS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '13:00', '13:30').people.includes('DP'), true);
+    assert.equal(_test.getAssignmentForSlot('thu', '13:00', '13:30').people.includes('DP'), false);
     assert.equal(_test.getAssignmentForSlot('mon', '22:30', '23:00').people.includes('RS'), true);
-    assert.equal(_test.getAssignmentForSlot('mon', '22:30', '23:00').people.includes('AS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '22:30', '23:00').people.includes('AS'), false);
     assert.equal(_test.getAssignmentForSlot('sat', '04:30', '05:00').people.includes('DP'), true);
     assert.equal(_test.formatLocalRange(0, '04:00', '10:00', 'Europe/London'), '09:00-15:00');
     assert.equal(_test.formatLocalRange(5, '04:30', '08:30', 'Europe/London'), '09:30-13:30');
+  });
+
+  _test.withRotaForTesting(ableWeekB, () => {
+    assert.equal(_test.getAssignmentForSlot('mon', '08:00', '08:30').people.includes('RS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '09:00', '09:30').people.includes('AS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '18:00', '18:30').people.includes('RS'), false);
+    assert.equal(_test.getAssignmentForSlot('mon', '18:00', '18:30').people.includes('AS'), true);
+    assert.equal(_test.getAssignmentForSlot('fri', '18:00', '18:30').people.length, 0);
+    assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '18:00', '18:30'), 'AS');
+    assert.equal(_test.getWeekendOnCallPersonForSlot('sat', '10:00', '10:30'), '');
   });
 });
 
@@ -167,12 +181,15 @@ test('Able ET model feeds validation, fairness, and weekend calculations separat
     assert.equal(warningCodes.includes('two-week-fairness-difference'), true);
     assert.equal(warningCodes.includes('late-to-early'), false);
     assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '17:30', '18:00'), '');
-    assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '18:00', '18:30'), 'AS');
-    assert.equal(_test.formatWeekendLocalRange('Europe/London'), 'Fri 15 May, 23:00 to Mon 18 May, 09:00');
-    assert.equal(scores.find((score) => score.id === 'DP').total, 54);
-    assert.equal(scores.find((score) => score.id === 'RS').assigned, 65);
-    assert.equal(scores.find((score) => score.id === 'AS').assigned, 55);
-    assert.equal(scores.find((score) => score.id === 'AS').weekend, 58);
+    assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '18:00', '18:30'), 'RS');
+    assert.equal(_test.getWeekendOnCallPersonForSlot('sat', '10:00', '10:30'), '');
+    assert.equal(_test.getWeekendOnCallPersonForSlot('sat', '18:00', '18:30'), 'RS');
+    assert.equal(_test.getWeekendOnCallPersonForSlot('sun', '18:00', '18:30'), 'RS');
+    assert.equal(_test.formatWeekendLocalRange('Europe/London'), 'Fri 15 May, 23:00 to Sat 16 May, 09:00; Sat 16 May, 23:00 to Sun 17 May, 09:00; Sun 17 May, 23:00 to Mon 18 May, 09:00');
+    assert.equal(scores.find((score) => score.id === 'DP').total, 40);
+    assert.equal(scores.find((score) => score.id === 'RS').assigned, 60);
+    assert.equal(scores.find((score) => score.id === 'RS').weekend, 30);
+    assert.equal(scores.find((score) => score.id === 'AS').assigned, 30);
   });
 });
 
