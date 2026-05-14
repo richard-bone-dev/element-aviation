@@ -150,11 +150,11 @@ const ROTA_DATA = {
     },
     rsCoverageSupport: {
       enabled: false,
-      normalBreakDurationMinutes: 60,
-      eveningDutyBreakDurationMinutes: 120,
+      normalBreakDurationMinutes: 90,
+      eveningDutyBreakDurationMinutes: 90,
       preferredBreakWindowET: { start: '14:00', end: '17:00' },
-      normalBreakStart: '14:00',
-      eveningDutyBreakStart: '14:00',
+      normalBreakStart: '13:00',
+      eveningDutyBreakStart: '13:00',
       maxWorkingBlocksPerDay: 2,
       excessiveContinuousSpanMinutes: 420
     },
@@ -180,7 +180,7 @@ const ROTA_DATA = {
       },
       weekdayEarlyStarts: {
         days: ['mon', 'tue', 'wed', 'thu', 'fri'],
-        start: '09:30',
+        start: '08:00',
         end: '16:30',
         timeZone: 'America/New_York',
         participants: ['RS', 'AS'],
@@ -213,7 +213,9 @@ const ROTA_DATA = {
       defaultCoreAssignments: 'DEFAULT_CORE_ASSIGNMENTS',
       weekdayEarlyOwner: 'WEEKDAY_EARLY_OWNER',
       asLateFairnessStart: 'AS_LATE_FAIRNESS_START',
-      weekdayEveningOwner: 'WEEKDAY_EVENING_OWNER'
+      weekdayEveningOwner: 'WEEKDAY_EVENING_OWNER',
+      rsWeekdayEveningOwner: 'RS_WEEKDAY_EVENING_OWNER',
+      rsWeekdayEarlyGapCover: 'RS_WEEKDAY_EARLY_GAP_COVER'
     },
     dailyWorkingHourRules: {
       people: ['RS', 'AS'],
@@ -247,41 +249,46 @@ const ROTA_DATA = {
   },
   schedule: {
     mon: [
-      { start: '09:30', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '08:00', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '09:30', end: '11:00', people: ['RS_WEEKDAY_EVENING_OWNER'] },
       { start: '10:00', end: '11:00', people: ['AS_LATE_FAIRNESS_START'] },
       { start: '11:00', end: '16:30', people: ['WEEKDAY_EVENING_OWNER'] },
-      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER'] },
+      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER', 'RS_WEEKDAY_EARLY_GAP_COVER'] },
       { start: '18:00', end: '20:00', people: ['WEEKDAY_EVENING_OWNER'] },
       { start: '20:00', end: '22:00', people: ['WEEKDAY_EVENING_OWNER'] }
     ],
     tue: [
-      { start: '09:30', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '08:00', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '09:30', end: '11:00', people: ['RS_WEEKDAY_EVENING_OWNER'] },
       { start: '10:00', end: '11:00', people: ['AS_LATE_FAIRNESS_START'] },
       { start: '11:00', end: '16:30', people: ['WEEKDAY_EVENING_OWNER'] },
-      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER'] },
+      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER', 'RS_WEEKDAY_EARLY_GAP_COVER'] },
       { start: '18:00', end: '20:00', people: ['WEEKDAY_EVENING_OWNER'] },
       { start: '20:00', end: '22:00', people: ['WEEKDAY_EVENING_OWNER'] }
     ],
     wed: [
-      { start: '09:30', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '08:00', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '09:30', end: '11:00', people: ['RS_WEEKDAY_EVENING_OWNER'] },
       { start: '10:00', end: '11:00', people: ['AS_LATE_FAIRNESS_START'] },
       { start: '11:00', end: '16:30', people: ['WEEKDAY_EVENING_OWNER'] },
-      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER'] },
+      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER', 'RS_WEEKDAY_EARLY_GAP_COVER'] },
       { start: '18:00', end: '20:00', people: ['WEEKDAY_EVENING_OWNER'] },
       { start: '20:00', end: '22:00', people: ['WEEKDAY_EVENING_OWNER'] }
     ],
     thu: [
-      { start: '09:30', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '08:00', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '09:30', end: '11:00', people: ['RS_WEEKDAY_EVENING_OWNER'] },
       { start: '10:00', end: '11:00', people: ['AS_LATE_FAIRNESS_START'] },
       { start: '11:00', end: '16:30', people: ['WEEKDAY_EVENING_OWNER'] },
-      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER'] },
+      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER', 'RS_WEEKDAY_EARLY_GAP_COVER'] },
       { start: '18:00', end: '22:00', people: ['WEEKDAY_EVENING_OWNER'] }
     ],
     fri: [
-      { start: '09:30', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '08:00', end: '16:30', people: ['WEEKDAY_EARLY_OWNER'] },
+      { start: '09:30', end: '11:00', people: ['RS_WEEKDAY_EVENING_OWNER'] },
       { start: '10:00', end: '11:00', people: ['AS_LATE_FAIRNESS_START'] },
       { start: '11:00', end: '16:30', people: ['WEEKDAY_EVENING_OWNER'] },
-      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER'] },
+      { start: '16:30', end: '18:00', people: ['WEEKDAY_EVENING_OWNER', 'RS_WEEKDAY_EARLY_GAP_COVER'] },
       { start: '18:00', end: '22:00', people: ['WEEKDAY_EVENING_OWNER'] }
     ]
   }
@@ -403,7 +410,21 @@ function createAbleEtRotaData() {
   able.config.coverageRules.weekday = { start: '04:00', end: '23:00', minPeople: 1 };
   able.config.coverageRules.peak = { start: '11:00', end: '17:00', idealPeople: 2 };
   able.config.coverageRules.weekendOnCall = { startDay: 'fri', start: '18:00', endDay: 'mon', end: '04:00' };
-  able.config.rsCoverageSupport = { ...able.config.rsCoverageSupport, enabled: false };
+  able.config.rsCoverageSupport = {
+    ...able.config.rsCoverageSupport,
+    enabled: false,
+    normalBreakDurationMinutes: 60,
+    eveningDutyBreakDurationMinutes: 120,
+    preferredBreakWindowET: { start: '14:00', end: '17:00' },
+    normalBreakStart: '14:00',
+    eveningDutyBreakStart: '14:00'
+  };
+  able.config.computedAssignmentTokens = {
+    defaultCoreAssignments: 'DEFAULT_CORE_ASSIGNMENTS',
+    weekdayEarlyOwner: 'WEEKDAY_EARLY_OWNER',
+    asLateFairnessStart: 'AS_LATE_FAIRNESS_START',
+    weekdayEveningOwner: 'WEEKDAY_EVENING_OWNER'
+  };
   able.config.availabilityRules = {
     DP: {
       fixedHoursAreAutomaticOnly: true
@@ -1642,7 +1663,8 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
 
   if (validationRuleEnabled('weekdayRotations') && isEvening(start, end)) {
     const expectedOwner = expectedEveningOwner();
-    if (expectedOwner && !people.includes(expectedOwner)) {
+    const ownerExcluded = isWeekdayRotationOwnershipExcluded('weekdayEvenings', expectedOwner, dayId, start, end);
+    if (expectedOwner && !ownerExcluded && !people.includes(expectedOwner)) {
       addIssue('warning', 'weekday-evening-rotation-conflict', `${day.label} ${start}-${end} ET should be owned by ${expectedOwner} under the weekday late-shift rotation; DP support does not satisfy this RS/AS rule.`, expectedOwner);
     }
   }
@@ -1650,7 +1672,8 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
   if (validationRuleEnabled('weekdayRotations') && isEarlyStart(start, end)) {
     const expectedOwner = expectedEarlyStartOwner();
     const eveningOwner = expectedEveningOwner();
-    if (expectedOwner && !people.includes(expectedOwner)) {
+    const ownerExcluded = isWeekdayRotationOwnershipExcluded('weekdayEarlyStarts', expectedOwner, dayId, start, end);
+    if (expectedOwner && !ownerExcluded && !people.includes(expectedOwner)) {
       addIssue('warning', 'weekday-early-start-rotation-conflict', `${day.label} ${start}-${end} ET should be owned by ${expectedOwner} under the weekday early-start rotation, unless availability prevents it.`, expectedOwner);
     }
     if (eveningOwner && hasAssignmentSource({ details }, eveningOwner, 'weekday-early-rotation')) {
@@ -1677,6 +1700,26 @@ function validateSlot(dayId, start, end, people, details = new Map()) {
 function validationRuleEnabled(ruleName) {
   const rules = rota.config.validationRules || {};
   return rules[ruleName] !== false;
+}
+
+function isWeekdayRotationOwnershipExcluded(rotationName, personId, dayId, start, end) {
+  if (rota.config.scheduleModelId !== 'current' || !isMondayToFriday(dayId)) {
+    return false;
+  }
+  if (rotationName === 'weekdayEarlyStarts' && personId === 'RS') {
+    return isRsBreakSlot(dayId, start, end);
+  }
+  if (rotationName === 'weekdayEvenings' && personId === 'AS') {
+    return isAsChildcareSlot(dayId, start, end);
+  }
+  return false;
+}
+
+function isAsChildcareSlot(dayId, start, end) {
+  if (!isMondayToFriday(dayId)) {
+    return false;
+  }
+  return getUnavailableBlocks('AS').some((block) => block.label && block.label.toLowerCase().includes('childcare') && intersects(start, end, block.start, block.end));
 }
 
 function validateWeekendRotation() {
@@ -1789,6 +1832,9 @@ function validateDailyWorkingHours() {
   rota.config.days.forEach((day) => {
     rule.people.forEach((personId) => {
       const hours = normalWorkingHoursForPersonOnDay(day.id, personId);
+      if (hours === 0) {
+        return;
+      }
       if (hours < rule.minHours || hours > rule.maxHours) {
         warnings.push({
           level: 'warning',
@@ -1856,11 +1902,19 @@ function normalWorkingHoursForPersonOnDay(dayId, personId) {
   const visibleGrid = visibleGridRule();
   return makeSlots(visibleGrid.start, visibleGrid.end).reduce((total, slot) => {
     const assignment = getAssignmentForSlot(dayId, slot.start, slot.end);
-    if (!assignment.people.includes(personId) || hasGeneratedRescueAssignment(assignment, personId)) {
+    if (!assignment.people.includes(personId) || !hasNormalWorkingHourAssignment(assignment, personId)) {
       return total;
     }
     return total + durationHours(slot.start, slot.end);
   }, 0);
+}
+
+function hasNormalWorkingHourAssignment(slot, personId) {
+  const assignments = slot.details && slot.details.get(personId) ? slot.details.get(personId) : [];
+  if (!assignments.length || hasGeneratedRescueAssignment(slot, personId)) {
+    return false;
+  }
+  return assignments.some((assignment) => !['weekday-evening-rotation', 'as-late-fairness-start', 'rs-early-gap-cover'].includes(assignment.source));
 }
 
 function workingRangesForPerson(dayId, personId) {
@@ -2138,9 +2192,22 @@ function resolveAssignmentEntry(dayId, start, end, personId, block) {
     if (!isPersonAvailableForAutoAssignment(owner, dayId, start, end)) {
       return [];
     }
+    if (owner === 'RS' && isRsBreakSlot(dayId, start, end)) {
+      return [];
+    }
     return [{
       personId: owner,
       source: 'weekday-early-rotation',
+      assignmentType: 'automatic'
+    }];
+  }
+  if (personId === tokens.rsWeekdayEveningOwner) {
+    if (expectedEveningOwner() !== 'RS' || !isPersonAvailableForAutoAssignment('RS', dayId, start, end) || isRsBreakSlot(dayId, start, end)) {
+      return [];
+    }
+    return [{
+      personId: 'RS',
+      source: 'weekday-evening-rotation',
       assignmentType: 'automatic'
     }];
   }
@@ -2159,9 +2226,22 @@ function resolveAssignmentEntry(dayId, start, end, personId, block) {
     if (!isPersonAvailableForAutoAssignment(owner, dayId, start, end)) {
       return [];
     }
+    if (owner === 'RS' && isRsBreakSlot(dayId, start, end)) {
+      return [];
+    }
     return [{
       personId: owner,
       source: 'weekday-evening-rotation',
+      assignmentType: 'automatic'
+    }];
+  }
+  if (personId === tokens.rsWeekdayEarlyGapCover) {
+    if (expectedEarlyStartOwner() !== 'RS' || !isPersonAvailableForAutoAssignment('RS', dayId, start, end) || isRsBreakSlot(dayId, start, end)) {
+      return [];
+    }
+    return [{
+      personId: 'RS',
+      source: 'rs-early-gap-cover',
       assignmentType: 'automatic'
     }];
   }
@@ -2274,10 +2354,16 @@ function getDefaultCoreAssignments(dayId, start, end) {
     if (earlyOwner && isPersonAvailableForAutoAssignment(earlyOwner, dayId, start, end)) {
       people.push(earlyOwner);
     }
+    if (!people.length && isPersonAvailableForAutoAssignment('RS', dayId, start, end)) {
+      people.push('RS');
+    }
     return Array.from(new Set(people));
   }
   if (isPersonAvailableForAutoAssignment('AS', dayId, start, end)) {
     people.push('AS');
+  }
+  if (!people.length && isPersonAvailableForAutoAssignment('RS', dayId, start, end)) {
+    people.push('RS');
   }
   return Array.from(new Set(people));
 }
