@@ -59,6 +59,99 @@ test('canonical rota source data matches corrected Phase 1 assumptions', () => {
   ]);
 });
 
+test('schedule model options keep the current working model as the default', () => {
+  assert.deepEqual(app.getScheduleModelOptions(), [
+    { id: 'current', label: 'Current Working Model', default: true },
+    { id: 'ableEt', label: 'Able ET Model', default: false }
+  ]);
+
+  assert.deepEqual(app.getScheduleModelSource('current'), canonicalRota());
+});
+
+test('Able ET model stores Able supplied hours as Eastern source data', () => {
+  const able = app.getScheduleModelSource('ableEt');
+
+  assert.equal(able.config.scheduleSourceTimeZone, 'America/New_York');
+  assert.equal(able.config.businessCoverageEnd, '23:00');
+  assert.deepEqual(able.config.coverageRules.weekendOnCall, {
+    startDay: 'fri',
+    start: '18:00',
+    endDay: 'mon',
+    end: '04:00'
+  });
+  assert.deepEqual(person(able, 'DP').fixedWorkingBlocks, [
+    {
+      id: 'able-dp-weekday-morning',
+      label: 'Able weekday morning fixed hours',
+      days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      start: '04:00',
+      end: '10:00',
+      timeZone: 'America/New_York',
+      type: 'fixed'
+    },
+    {
+      id: 'able-dp-weekday-afternoon',
+      label: 'Able weekday afternoon fixed hours',
+      days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+      start: '13:00',
+      end: '17:00',
+      timeZone: 'America/New_York',
+      type: 'fixed'
+    },
+    {
+      id: 'able-dp-sat-morning',
+      label: 'Able Saturday fixed hours',
+      days: ['Sat'],
+      start: '04:30',
+      end: '08:30',
+      timeZone: 'America/New_York',
+      type: 'fixed'
+    }
+  ]);
+  assert.deepEqual(able.schedule.mon, [
+    { start: '08:00', end: '16:00', people: ['RS'] },
+    { start: '18:00', end: '23:00', people: ['RS'] },
+    { start: '09:00', end: '15:00', people: ['AS'] },
+    { start: '18:00', end: '23:00', people: ['AS'] }
+  ]);
+});
+
+test('Able ET model renders ET source slots with date-aware UK equivalents', () => {
+  const able = app.getScheduleModelSource('ableEt');
+
+  _test.withRotaForTesting(able, () => {
+    assert.equal(_test.getAssignmentForSlot('mon', '04:00', '04:30').people.includes('DP'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '09:00', '09:30').people.includes('RS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '09:00', '09:30').people.includes('AS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '22:30', '23:00').people.includes('RS'), true);
+    assert.equal(_test.getAssignmentForSlot('mon', '22:30', '23:00').people.includes('AS'), true);
+    assert.equal(_test.getAssignmentForSlot('sat', '04:30', '05:00').people.includes('DP'), true);
+    assert.equal(_test.formatLocalRange(0, '04:00', '10:00', 'Europe/London'), '09:00-15:00');
+    assert.equal(_test.formatLocalRange(5, '04:30', '08:30', 'Europe/London'), '09:30-13:30');
+  });
+});
+
+test('Able ET model feeds validation, fairness, and weekend calculations separately', () => {
+  const able = app.getScheduleModelSource('ableEt');
+
+  _test.withRotaForTesting(able, () => {
+    const validation = _test.validateRota();
+    const scores = _test.calculateFairness(validation);
+    const warningCodes = validation.warnings.map((warning) => warning.code);
+
+    assert.equal(warningCodes.includes('fixed-hours-missing'), false);
+    assert.equal(warningCodes.includes('weekday-evening-rotation-conflict'), false);
+    assert.equal(warningCodes.includes('weekday-early-start-rotation-conflict'), false);
+    assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '17:30', '18:00'), '');
+    assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '18:00', '18:30'), 'AS');
+    assert.equal(_test.formatWeekendLocalRange('Europe/London'), 'Fri 15 May, 23:00 to Mon 18 May, 09:00');
+    assert.equal(scores.find((score) => score.id === 'DP').total, 54);
+    assert.equal(scores.find((score) => score.id === 'RS').assigned, 65);
+    assert.equal(scores.find((score) => score.id === 'AS').assigned, 55);
+    assert.equal(scores.find((score) => score.id === 'AS').weekend, 58);
+  });
+});
+
 test('weekend on-call runs Friday 22:00 ET to Monday 04:00 ET', () => {
   _test.withRotaForTesting(canonicalRota(), () => {
     assert.equal(_test.getWeekendOnCallPersonForSlot('fri', '21:30', '22:00'), '');
